@@ -10,10 +10,11 @@ A workflow is a directed graph:
 - States are nodes.
 - Transitions are directed edges.
 
-### Required workflow fields
+## Workflow Configuration
+
+Required top-level fields:
 
 - `initial_state`: state id used for newly created issues.
-- `issue_prefix`: prefix used in issue identifiers and filenames (for example, `ISSUE`).
 - `states`: list of workflow states.
 - `transitions`: list of allowed state transitions.
 
@@ -32,17 +33,12 @@ Each transition must contain:
 - `from`: source state id.
 - `to`: destination state id.
 
-## Configuration File
+`from` and `to` must reference state ids declared in `states`.
 
-Workflow configuration lives in:
-
-`.gitlane/issues/workflow.toml`
-
-Example:
+### Example `.gitlane/issues/workflow.toml`
 
 ```toml
 initial_state = "todo"
-issue_prefix = "ISSUE"
 
 [[states]]
 id = "todo"
@@ -107,4 +103,13 @@ git mv \
   .gitlane/issues/review/
 ```
 
-This path move is the state change.
+The file move is the state change.
+
+## Related Configuration
+
+Workflow does not define issue metadata.
+
+- Issue config lives in `.gitlane/issues/issues.toml`.
+- Label config lives in `.gitlane/issues/labels.toml`.
+
+See `docs/issues.md` and `docs/labels.md` for issue metadata schemas.
