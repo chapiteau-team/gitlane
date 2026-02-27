@@ -15,62 +15,61 @@ A workflow is a directed graph:
 Required top-level fields:
 
 - `initial_state`: state id used for newly created issues.
-- `states`: list of workflow states.
-- `transitions`: list of allowed state transitions.
+- `states`: map of state id to state config.
+- `transitions`: map of source state id to transition map.
 
 ### State schema
 
-Each state must contain:
+Each state id is the key in `[states]`.
 
-- `id`: stable machine id.
+Each state entry must contain:
+
 - `name`: human-readable display name.
 
 ### Transition schema
 
-Each transition must contain:
+Each source state id is the key in `[transitions]`.
+
+Each transition id is then a key in `[transitions.<from_state_id>]`.
+
+Each transition entry must contain:
 
 - `name`: human-readable transition name.
-- `from`: source state id.
 - `to`: destination state id.
 
-`from` and `to` must reference state ids declared in `states`.
+`initial_state`, transition source ids, and transition `to` values must reference state ids declared in `[states]`.
+
+If a state has no outgoing transitions, it can be omitted from `[transitions]`.
 
 ### Example `.gitlane/issues/workflow.toml`
 
 ```toml
 initial_state = "todo"
 
-[[states]]
-id = "todo"
-name = "To Do"
+[states]
+todo = { name = "To Do" }
+in_progress = { name = "In Progress" }
+review = { name = "In Review" }
+done = { name = "Done" }
 
-[[states]]
-id = "in_progress"
-name = "In Progress"
+[transitions.todo]
+start_work = { name = "Start work", to = "in_progress" }
 
-[[states]]
-id = "review"
-name = "In Review"
+[transitions.in_progress]
+request_review = { name = "Request review", to = "review" }
 
-[[states]]
-id = "done"
-name = "Done"
-
-[[transitions]]
-name = "Start work"
-from = "todo"
-to = "in_progress"
-
-[[transitions]]
-name = "Request review"
-from = "in_progress"
-to = "review"
-
-[[transitions]]
-name = "Approve"
-from = "review"
-to = "done"
+[transitions.review]
+approve = { name = "Approve", to = "done" }
+request_changes = { name = "Request changes", to = "in_progress" }
 ```
+
+## Derived State Ordering
+
+Workflow order is derived from transitions.
+
+- Compute shortest directed distance from `initial_state` to every reachable state.
+- Sort states by `(distance, state_id)` for deterministic output.
+- Place unreachable states last, sorted by `state_id`.
 
 ## Filesystem Mapping
 
