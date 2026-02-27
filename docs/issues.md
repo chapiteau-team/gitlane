@@ -110,3 +110,58 @@ Collision strategy:
 
 - If an issue directory with the candidate id already exists in any workflow state directory, increment `unix_ms` by 1 and re-encode.
 - Repeat until a free issue directory name is found.
+
+## Issue File Structure
+
+`issue.md` is Markdown with required TOML front matter, followed by a user-defined Markdown body.
+
+```markdown
++++
+created_at = "2026-02-27T10:08:15Z"
+updated_at = "2026-02-27T10:08:15Z"
+reporter = "@kalaninja"
+assignees = []
+priority = "p2"
+labels = ["docs"]
++++
+
+Any Markdown content is valid here.
+```
+
+### Metadata schema
+
+Required fields:
+
+- `created_at`: RFC3339 UTC timestamp (`Z` suffix).
+- `updated_at`: RFC3339 UTC timestamp (`Z` suffix).
+- `reporter`: person reference string (for example, `@kalaninja`).
+- `assignees`: array of person reference strings.
+- `priority`: priority id from `.gitlane/issues/issues.toml`.
+- `labels`: array of label ids from `.gitlane/issues/labels.toml`.
+
+Semantics:
+
+- `created_at` is immutable after issue creation.
+- `reporter` is immutable after issue creation.
+- `updated_at` must be greater than or equal to `created_at`.
+- `assignees` must be unique.
+- `labels` must be unique.
+- Person reference format is repository-defined (for example, GitHub handle).
+- Metadata key order has no semantic meaning.
+- Unknown metadata keys are allowed for forward compatibility.
+
+Path-derived fields:
+
+- Issue id is derived from `<id>` in `.gitlane/issues/<state>/<id>/issue.md`.
+- Workflow state is derived from `<state>` in `.gitlane/issues/<state>/<id>/issue.md`.
+- `id` and `state` are not stored in issue front matter.
+
+### Markdown body
+
+- The Markdown body is unconstrained and fully user-defined.
+- Tooling should treat body content as opaque unless explicitly editing it.
+
+### History
+
+- Issue history is tracked by Git commits.
+- Issue files do not maintain an in-file change log.
