@@ -75,6 +75,8 @@ Workflow order is derived from transitions.
 
 Every state defined in the workflow maps to a directory under `.gitlane/issues`.
 
+Each state directory contains zero or more issue directories named by issue id.
+
 Examples:
 
 - `.gitlane/issues/todo`
@@ -82,27 +84,27 @@ Examples:
 - `.gitlane/issues/review`
 - `.gitlane/issues/done`
 
-Workflow state equals issue file path parent directory name.
+Workflow state equals the `<state>` segment in the issue path.
 
 If an issue is stored at:
 
-`.gitlane/issues/in_progress/ISSUE-42.md`
+`.gitlane/issues/in_progress/ISSUE-m8x4gn8/issue.md`
 
 Its state is `in_progress`.
 
 ## Transitioning State
 
-Transitioning an issue from one state to another is done by moving the issue file between state directories.
+Transitioning an issue from one state to another is done by moving the issue directory between state directories.
 
 Example:
 
 ```bash
 git mv \
-  .gitlane/issues/in_progress/ISSUE-42.md \
+  .gitlane/issues/in_progress/ISSUE-m8x4gn8 \
   .gitlane/issues/review/
 ```
 
-The file move is the state change.
+The directory move is the state change.
 
 ## Related Configuration
 
