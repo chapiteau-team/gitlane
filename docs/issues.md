@@ -66,8 +66,8 @@ p4 = { name = "Low", description = "Can be deferred" }
 
 ### Related Configuration
 
-- Labels and label groups are documented in `docs/labels.md`.
-- Workflow states and transitions are documented in `docs/workflow.md`.
+- Labels and label groups are documented in [`docs/labels.md`](labels.md).
+- Workflow states and transitions are documented in [`docs/workflow.md`](workflow.md).
 
 ## Issue Directory Structure
 

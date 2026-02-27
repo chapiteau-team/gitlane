@@ -113,4 +113,4 @@ Workflow does not define issue metadata.
 - Issue config lives in `.gitlane/issues/issues.toml`.
 - Label config lives in `.gitlane/issues/labels.toml`.
 
-See `docs/issues.md` and `docs/labels.md` for issue metadata schemas.
+See [`docs/issues.md`](issues.md) and [`docs/labels.md`](labels.md) for issue metadata schemas.
