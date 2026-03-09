@@ -1,0 +1,13 @@
+[package]
+name = "gitlane-cli"
+version = { workspace = true }
+edition = { workspace = true }
+
+[[bin]]
+name = "gitlane"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+gitlane = { path = "../core" }

@@ -5,8 +5,10 @@ Guide for agentic coding assistants operating in this repository.
 ## 1) Repository Overview
 - Language: Rust
 - Build tool: Cargo
-- Edition: 2024 (`Cargo.toml`)
-- Current crate shape: single binary target (`src/main.rs`)
+- Edition: 2024 (workspace members)
+- Current crate shape: Cargo workspace with two crates:
+  - `crates/core`: reusable core library package (`gitlane`)
+  - `crates/cli`: CLI binary package (`gitlane-cli`, binary name: `gitlane`)
 - Root to run commands from: `.` (repository root)
 
 This repo is currently small; use idiomatic Rust defaults and keep changes minimal.
@@ -22,11 +24,11 @@ If any of these files appear later, treat them as high-priority constraints and 
 ## 3) Build / Run / Lint / Test Commands
 
 ### Build + Run
-- Build (debug): `cargo build`
-- Build (release): `cargo build --release`
-- Typecheck quickly: `cargo check`
-- Run app: `cargo run`
-- Run app (release): `cargo run --release`
+- Build all (debug): `cargo build --workspace`
+- Build all (release): `cargo build --workspace --release`
+- Typecheck quickly: `cargo check --workspace`
+- Run CLI app: `cargo run -p gitlane-cli -- <command> [options]`
+- Run CLI app (release): `cargo run -p gitlane-cli --release -- <command> [options]`
 
 ### Formatting
 - Format code: `cargo fmt`
@@ -34,33 +36,33 @@ If any of these files appear later, treat them as high-priority constraints and 
 
 ### Linting
 - Recommended strict lint command:
-  `cargo clippy --all-targets --all-features -- -D warnings`
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - If needed for speed in large dependency graphs:
-  `cargo clippy --all-targets --all-features --no-deps -- -D warnings`
+  `cargo clippy --workspace --all-targets --all-features --no-deps -- -D warnings`
 
 ### Tests
-- Run all tests: `cargo test`
-- Run tests and show stdout/stderr: `cargo test -- --nocapture`
-- List discovered tests: `cargo test -- --list`
+- Run all tests: `cargo test --workspace`
+- Run tests and show stdout/stderr: `cargo test --workspace -- --nocapture`
+- List discovered tests: `cargo test --workspace -- --list`
 
 ### Running a Single Test (important)
-- By substring match: `cargo test name_substring`
-- Exact unit test name: `cargo test exact_test_name -- --exact`
-- Entire integration test file: `cargo test --test integration_file_stem`
+- By substring match: `cargo test -p <package> name_substring`
+- Exact unit test name: `cargo test -p <package> exact_test_name -- --exact`
+- Entire integration test file: `cargo test -p <package> --test integration_file_stem`
 - One test in one integration target:
-  `cargo test --test integration_file_stem exact_test_name -- --exact`
+  `cargo test -p <package> --test integration_file_stem exact_test_name -- --exact`
 
 ### Useful test runner flags
-- Serial execution: `cargo test -- --test-threads=1`
-- Skip by pattern: `cargo test -- --skip flaky_case`
-- Ignored tests only: `cargo test -- --ignored`
-- Include ignored + normal: `cargo test -- --include-ignored`
+- Serial execution: `cargo test --workspace -- --test-threads=1`
+- Skip by pattern: `cargo test --workspace -- --skip flaky_case`
+- Ignored tests only: `cargo test --workspace -- --ignored`
+- Include ignored + normal: `cargo test --workspace -- --include-ignored`
 
 ## 4) Suggested Local Verification Before Handoff
 Run these before finalizing substantial changes:
 1. `cargo fmt --all -- --check`
-2. `cargo clippy --all-targets --all-features -- -D warnings`
-3. `cargo test`
+2. `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+3. `cargo test --workspace`
 
 If one cannot be run locally, explicitly note that in your handoff.
 
@@ -126,20 +128,21 @@ If one cannot be run locally, explicitly note that in your handoff.
 - Mention verification commands executed in final handoff.
 
 ## 8) Quick Command Cheat Sheet
-- Build: `cargo build`
-- Check: `cargo check`
+- Build: `cargo build --workspace`
+- Check: `cargo check --workspace`
+- Run CLI: `cargo run -p gitlane-cli -- <command>`
 - Format check: `cargo fmt --all -- --check`
-- Lint: `cargo clippy --all-targets --all-features -- -D warnings`
-- Test all: `cargo test`
-- Test one (substring): `cargo test name_substring`
-- Test one (exact): `cargo test exact_test_name -- --exact`
-- List tests: `cargo test -- --list`
+- Lint: `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- Test all: `cargo test --workspace`
+- Test one (substring): `cargo test -p <package> name_substring`
+- Test one (exact): `cargo test -p <package> exact_test_name -- --exact`
+- List tests: `cargo test --workspace -- --list`
 
 ## 9) File Maintenance Policy
 When build, lint, test, or style conventions change, update `AGENTS.md` in the same change set so future agents stay aligned with real repo behavior.
 
 ## 10) Notes for Future Growth
-- If workspace members are added, include per-crate commands.
+- If workspace members are added, include per-crate commands and preferred run targets.
 - If CI is added, mirror exact CI commands here.
 - If custom lint configs appear (`clippy.toml`, `rustfmt.toml`), document key rules.
 - If Cursor/Copilot rules are added later, copy key constraints into this file.
