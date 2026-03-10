@@ -1,7 +1,7 @@
 mod error;
-mod service;
+mod gitlane;
 
 pub mod paths;
 
 pub use error::{Error, Result};
-pub use service::Gitlane;
+pub use gitlane::Gitlane;

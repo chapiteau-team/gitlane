@@ -1,0 +1,201 @@
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
+
+use anyhow::{Context, anyhow, bail};
+use gitlane::paths::{GITLANE_DIR, PROJECT_CONFIG_FILE};
+
+pub fn resolve_project(start_path: PathBuf) -> anyhow::Result<PathBuf> {
+    let start = start_path
+        .canonicalize()
+        .with_context(|| format!("failed to resolve `{}`", start_path.display()))?;
+
+    let mut cursor = if start.is_file() {
+        start
+            .parent()
+            .map(Path::to_path_buf)
+            .ok_or_else(|| anyhow!("`{}` has no parent directory", start.display()))?
+    } else {
+        start.clone()
+    };
+
+    loop {
+        if is_gitlane_dir(&cursor) {
+            return validate_project(cursor);
+        }
+
+        let candidate = cursor.join(GITLANE_DIR);
+        if candidate.is_dir() {
+            return validate_project(candidate);
+        }
+
+        let Some(parent) = cursor.parent() else {
+            break;
+        };
+
+        cursor = parent.to_path_buf();
+    }
+
+    bail!(
+        "unable to find `{}` from `{}` or any parent directory",
+        GITLANE_DIR,
+        start.display()
+    )
+}
+
+fn is_gitlane_dir(path: &Path) -> bool {
+    path.file_name() == Some(OsStr::new(GITLANE_DIR)) && path.is_dir()
+}
+
+fn validate_project(project: PathBuf) -> anyhow::Result<PathBuf> {
+    let project_config = project.join(PROJECT_CONFIG_FILE);
+    if !project_config.is_file() {
+        bail!(
+            "found project directory `{}` but missing `{}`",
+            project.display(),
+            project_config.display()
+        );
+    }
+
+    Ok(project)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::{
+        fs,
+        sync::atomic::{AtomicUsize, Ordering},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    struct TempDir {
+        path: PathBuf,
+    }
+
+    impl TempDir {
+        fn new() -> Self {
+            let since_epoch = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system clock should be after UNIX_EPOCH")
+                .as_nanos();
+            let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "gitlane-cli-tests-{}-{}-{}",
+                std::process::id(),
+                since_epoch,
+                counter
+            ));
+
+            fs::create_dir_all(&path).expect("temp test directory should be created");
+            Self { path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn create_project_with_config(base: &Path) -> PathBuf {
+        let project_dir = base.join("work");
+        let gitlane_dir = project_dir.join(GITLANE_DIR);
+
+        fs::create_dir_all(&gitlane_dir).expect(".gitlane directory should be created");
+        fs::write(gitlane_dir.join(PROJECT_CONFIG_FILE), "")
+            .expect("project.toml should be created");
+
+        gitlane_dir
+    }
+
+    #[test]
+    fn resolves_project_when_start_path_contains_gitlane_dir() {
+        let temp_dir = TempDir::new();
+        let gitlane_dir = create_project_with_config(temp_dir.path());
+        let project_dir = gitlane_dir
+            .parent()
+            .expect(".gitlane should have a parent")
+            .to_path_buf();
+
+        let resolved = resolve_project(project_dir).expect("project should resolve");
+
+        assert_eq!(resolved, gitlane_dir);
+    }
+
+    #[test]
+    fn resolves_project_when_start_path_is_gitlane_dir() {
+        let temp_dir = TempDir::new();
+        let gitlane_dir = create_project_with_config(temp_dir.path());
+
+        let resolved = resolve_project(gitlane_dir.clone()).expect("project should resolve");
+
+        assert_eq!(resolved, gitlane_dir);
+    }
+
+    #[test]
+    fn resolves_project_from_nested_directory() {
+        let temp_dir = TempDir::new();
+        let gitlane_dir = create_project_with_config(temp_dir.path());
+        let nested = gitlane_dir
+            .parent()
+            .expect(".gitlane should have a parent")
+            .join("src")
+            .join("feature");
+        fs::create_dir_all(&nested).expect("nested directory should be created");
+
+        let resolved = resolve_project(nested).expect("project should resolve");
+
+        assert_eq!(resolved, gitlane_dir);
+    }
+
+    #[test]
+    fn resolves_project_from_file_path() {
+        let temp_dir = TempDir::new();
+        let gitlane_dir = create_project_with_config(temp_dir.path());
+        let nested_dir = gitlane_dir
+            .parent()
+            .expect(".gitlane should have a parent")
+            .join("src");
+        fs::create_dir_all(&nested_dir).expect("nested directory should be created");
+        let file_path = nested_dir.join("input.txt");
+        fs::write(&file_path, "data").expect("input file should be created");
+
+        let resolved = resolve_project(file_path).expect("project should resolve");
+
+        assert_eq!(resolved, gitlane_dir);
+    }
+
+    #[test]
+    fn errors_when_gitlane_dir_is_missing() {
+        let temp_dir = TempDir::new();
+        let start_dir = temp_dir.path().join("work");
+        fs::create_dir_all(&start_dir).expect("start directory should be created");
+
+        let err = resolve_project(start_dir).expect_err("resolution should fail");
+
+        assert!(err.to_string().contains("unable to find `.gitlane`"));
+    }
+
+    #[test]
+    fn errors_when_project_toml_is_missing() {
+        let temp_dir = TempDir::new();
+        let project_dir = temp_dir.path().join("work");
+        let gitlane_dir = project_dir.join(GITLANE_DIR);
+        fs::create_dir_all(&gitlane_dir).expect(".gitlane directory should be created");
+
+        let err = resolve_project(project_dir).expect_err("resolution should fail");
+        let err_text = err.to_string();
+
+        assert!(err_text.contains("missing"));
+        assert!(err_text.contains("project.toml"));
+    }
+}

@@ -11,7 +11,7 @@ use clap::{Args, Parser, Subcommand};
 )]
 pub struct Cli {
     #[arg(long, global = true, value_name = "PATH")]
-    pub repo_root: Option<PathBuf>,
+    pub project: Option<PathBuf>,
 
     #[command(subcommand)]
     pub command: Command,

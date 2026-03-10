@@ -1,4 +1,5 @@
 pub const GITLANE_DIR: &str = ".gitlane";
+pub const PROJECT_CONFIG_FILE: &str = "project.toml";
 pub const ISSUES_DIR: &str = ".gitlane/issues";
 
 pub const WORKFLOW_CONFIG: &str = ".gitlane/issues/workflow.toml";
