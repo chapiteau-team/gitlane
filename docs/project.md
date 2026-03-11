@@ -16,6 +16,14 @@ Project configuration lives in:
 
 - `description`: short project description.
 - `homepage`: project homepage URL string (recommended to use an absolute `https://` URL).
+- `people`: ordered list of person handles used in issue metadata (for example, `"@kalaninja"`).
+
+### `people` semantics
+
+- `people` is optional.
+- Each entry must be a non-empty string handle.
+- Entries must be unique.
+- Order is preserved for deterministic display.
 
 ## Example minimal `.gitlane/project.toml`
 
@@ -29,6 +37,7 @@ name = "Gitlane"
 name = "Gitlane"
 description = "Git-native task tracker"
 homepage = "https://github.com/example/gitlane"
+people = ["@alice", "@bob", "@carol"]
 ```
 
 ## Related Configuration

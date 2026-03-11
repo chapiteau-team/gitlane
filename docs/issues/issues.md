@@ -148,7 +148,9 @@ Semantics:
 - `updated_at` must be greater than or equal to `created_at`.
 - `assignees` must be unique.
 - `labels` must be unique.
-- Person reference format is repository-defined (for example, GitHub handle).
+- If `people` exists in `.gitlane/project.toml`, `reporter` and every `assignees` value must be present in that list.
+- If `people` is omitted in `.gitlane/project.toml`, any non-empty person reference string is allowed.
+- Person reference format is repository-defined (for example, `@kalaninja`).
 - Metadata key order has no semantic meaning.
 - Unknown metadata keys are allowed for forward compatibility.
 
