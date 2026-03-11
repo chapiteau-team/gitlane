@@ -65,50 +65,11 @@ fn validate_project(project: PathBuf) -> anyhow::Result<PathBuf> {
 mod tests {
     use super::*;
 
-    use std::{
-        fs,
-        sync::atomic::{AtomicUsize, Ordering},
-        time::{SystemTime, UNIX_EPOCH},
-    };
-
-    static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-    struct TempDir {
-        path: PathBuf,
-    }
-
-    impl TempDir {
-        fn new() -> Self {
-            let since_epoch = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("system clock should be after UNIX_EPOCH")
-                .as_nanos();
-            let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!(
-                "gitlane-cli-tests-{}-{}-{}",
-                std::process::id(),
-                since_epoch,
-                counter
-            ));
-
-            fs::create_dir_all(&path).expect("temp test directory should be created");
-            Self { path }
-        }
-
-        fn path(&self) -> &Path {
-            &self.path
-        }
-    }
-
-    impl Drop for TempDir {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.path);
-        }
-    }
+    use std::fs;
+    use tempfile::TempDir;
 
     fn create_project_with_config(base: &Path) -> PathBuf {
-        let project_dir = base.join("work");
-        let gitlane_dir = project_dir.join(GITLANE_DIR);
+        let gitlane_dir = base.join(GITLANE_DIR);
 
         fs::create_dir_all(&gitlane_dir).expect(".gitlane directory should be created");
         fs::write(gitlane_dir.join(PROJECT_CONFIG_FILE), "")
@@ -119,7 +80,7 @@ mod tests {
 
     #[test]
     fn resolves_project_when_start_path_contains_gitlane_dir() {
-        let temp_dir = TempDir::new();
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
         let gitlane_dir = create_project_with_config(temp_dir.path());
         let project_dir = gitlane_dir
             .parent()
@@ -133,7 +94,7 @@ mod tests {
 
     #[test]
     fn resolves_project_when_start_path_is_gitlane_dir() {
-        let temp_dir = TempDir::new();
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
         let gitlane_dir = create_project_with_config(temp_dir.path());
 
         let resolved = resolve_project(gitlane_dir.clone()).expect("project should resolve");
@@ -143,7 +104,7 @@ mod tests {
 
     #[test]
     fn resolves_project_from_nested_directory() {
-        let temp_dir = TempDir::new();
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
         let gitlane_dir = create_project_with_config(temp_dir.path());
         let nested = gitlane_dir
             .parent()
@@ -159,7 +120,7 @@ mod tests {
 
     #[test]
     fn resolves_project_from_file_path() {
-        let temp_dir = TempDir::new();
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
         let gitlane_dir = create_project_with_config(temp_dir.path());
         let nested_dir = gitlane_dir
             .parent()
@@ -176,9 +137,8 @@ mod tests {
 
     #[test]
     fn errors_when_gitlane_dir_is_missing() {
-        let temp_dir = TempDir::new();
-        let start_dir = temp_dir.path().join("work");
-        fs::create_dir_all(&start_dir).expect("start directory should be created");
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let start_dir = temp_dir.path().to_path_buf();
 
         let err = resolve_project(start_dir).expect_err("resolution should fail");
 
@@ -187,8 +147,8 @@ mod tests {
 
     #[test]
     fn errors_when_project_toml_is_missing() {
-        let temp_dir = TempDir::new();
-        let project_dir = temp_dir.path().join("work");
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let project_dir = temp_dir.path().to_path_buf();
         let gitlane_dir = project_dir.join(GITLANE_DIR);
         fs::create_dir_all(&gitlane_dir).expect(".gitlane directory should be created");
 

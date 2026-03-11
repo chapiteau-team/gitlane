@@ -9,6 +9,6 @@ fn main() -> anyhow::Result<()> {
     let project_path = cli.project.unwrap_or(std::env::current_dir()?);
     let project_path = path::resolve_project(project_path)?;
 
-    let _service = Gitlane::new(project_path);
+    let _service = Gitlane::new(project_path)?;
     Ok(())
 }
