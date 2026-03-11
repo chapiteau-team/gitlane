@@ -15,6 +15,7 @@ The design goals are:
 ## Documentation
 
 - [CLI reference](docs/cli.md)
+- [Project configuration](docs/project.md)
 - [Workflow definition](docs/workflow.md)
 - [Issue model](docs/issues.md)
 - [Label configuration](docs/labels.md)

@@ -66,6 +66,7 @@ p4 = { name = "Low", description = "Can be deferred" }
 
 ### Related Configuration
 
+- Project metadata is documented in [`docs/project.md`](project.md).
 - Labels and label groups are documented in [`docs/labels.md`](labels.md).
 - Workflow states and transitions are documented in [`docs/workflow.md`](workflow.md).
 

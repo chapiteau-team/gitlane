@@ -110,6 +110,7 @@ The directory move is the state change.
 
 Workflow does not define issue metadata.
 
+- Project metadata is documented in [`docs/project.md`](project.md).
 - Issue config lives in `.gitlane/issues/issues.toml`.
 - Label config lives in `.gitlane/issues/labels.toml`.
 

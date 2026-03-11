@@ -14,11 +14,12 @@ Global options:
   directory. Discovery walks up parent directories (same style as `.git` discovery) and accepts either a `.gitlane`
   directory directly or a directory containing `.gitlane`. The resolved `.gitlane` directory must contain
   `project.toml`.
+  Project config schema is documented in [`docs/project.md`](project.md).
 
 ## Supported Commands
 
 - `init`
-    - Purpose: prepare `.gitlane` repository structure and baseline config files.
+    - Purpose: prepare `.gitlane` repository structure and baseline config files, including `.gitlane/project.toml`.
     - Status: scaffolded, not implemented.
 - `validate`
     - Purpose: validate workflow, issue, and label configuration and data shape.
