@@ -127,6 +127,17 @@ If one cannot be run locally, explicitly note that in your handoff.
 - If adding tooling/scripts, document new commands here immediately.
 - Mention verification commands executed in final handoff.
 
+### Domain Docs (Read First)
+- Treat `docs/` as the canonical source for product behavior and data-model semantics.
+- Before changing CLI behavior or config/data validation, read the relevant doc first:
+  - `docs/cli.md` (command surface and expected behavior)
+  - `docs/project.md` (`.gitlane/project.toml` schema)
+  - `docs/workflow.md` (state graph and transition rules)
+  - `docs/issues.md` (issue IDs, front matter, and filesystem layout)
+  - `docs/labels.md` (label/group schema and constraints)
+- Keep `AGENTS.md` as a pointer/index; do not duplicate full schema rules from `docs/`.
+- If implementation and docs diverge, call out the mismatch in handoff; when behavior changes intentionally, update `docs/` and `AGENTS.md` in the same change set.
+
 ## 8) Quick Command Cheat Sheet
 - Build: `cargo build --workspace`
 - Check: `cargo check --workspace`
