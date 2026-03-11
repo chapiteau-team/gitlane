@@ -66,9 +66,9 @@ p4 = { name = "Low", description = "Can be deferred" }
 
 ### Related Configuration
 
-- Project metadata is documented in [`docs/project.md`](project.md).
-- Labels and label groups are documented in [`docs/labels.md`](labels.md).
-- Workflow states and transitions are documented in [`docs/workflow.md`](workflow.md).
+- Project metadata is documented in [`project.md`](../project.md).
+- Labels and label groups are documented in [`labels.md`](labels.md).
+- Workflow states and transitions are documented in [`workflow.md`](workflow.md).
 
 ## Issue Directory Structure
 
@@ -109,7 +109,8 @@ Where:
 
 Collision strategy:
 
-- If an issue directory with the candidate id already exists in any workflow state directory, increment `unix_ms` by 1 and re-encode.
+- If an issue directory with the candidate id already exists in any workflow state directory, increment `unix_ms` by 1
+  and re-encode.
 - Repeat until a free issue directory name is found.
 
 ## Issue File Structure

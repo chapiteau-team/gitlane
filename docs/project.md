@@ -33,6 +33,6 @@ homepage = "https://github.com/example/gitlane"
 
 ## Related Configuration
 
-- Workflow states and transitions are documented in [`docs/workflow.md`](workflow.md).
-- Issue metadata is documented in [`docs/issues.md`](issues.md).
-- Labels and label groups are documented in [`docs/labels.md`](labels.md).
+- Workflow states and transitions are documented in [`docs/issues/workflow.md`](issues/workflow.md).
+- Issue metadata is documented in [`docs/issues/issues.md`](issues/issues.md).
+- Labels and label groups are documented in [`docs/issues/labels.md`](issues/labels.md).
