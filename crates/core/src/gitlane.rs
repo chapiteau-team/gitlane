@@ -13,7 +13,7 @@ pub struct Gitlane {
 }
 
 impl Gitlane {
-    pub fn new(project_path: impl Into<PathBuf>) -> Result<Self, GitlaneError> {
+    pub fn load(project_path: impl Into<PathBuf>) -> Result<Self, GitlaneError> {
         let project_path = project_path.into();
         let project_config = ProjectConfig::load(&project_path)?;
 
@@ -28,7 +28,7 @@ impl Gitlane {
         options: InitOptions,
     ) -> Result<Self, GitlaneInitError> {
         let project_path = init::initialize(project_path, options)?;
-        Ok(Self::new(project_path)?)
+        Ok(Self::load(project_path)?)
     }
 
     pub fn project_path(&self) -> &Path {
@@ -61,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    fn loads_project_config_on_new() {
+    fn loads_project_config() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_dir = create_project_dir(
             temp_dir.path(),
@@ -71,7 +71,7 @@ people = ["@alice", "@bob"]
 "#,
         );
 
-        let service = Gitlane::new(project_dir.clone()).expect("service should initialize");
+        let service = Gitlane::load(project_dir.clone()).expect("service should initialize");
 
         assert_eq!(service.project_path(), project_dir);
         assert_eq!(service.project_config().name(), "Gitlane");
@@ -91,7 +91,7 @@ name = ""
 "#,
         );
 
-        let err = Gitlane::new(project_dir).expect_err("invalid config should fail");
+        let err = Gitlane::load(project_dir).expect_err("invalid config should fail");
         assert!(matches!(
             err,
             GitlaneError::ProjectConfig(ProjectConfigError::EmptyName)
