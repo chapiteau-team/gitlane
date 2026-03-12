@@ -45,3 +45,9 @@ people = ["@alice", "@bob", "@carol"]
 - Workflow states and transitions are documented in [`docs/issues/workflow.md`](issues/workflow.md).
 - Issue metadata is documented in [`docs/issues/issues.md`](issues/issues.md).
 - Labels and label groups are documented in [`docs/issues/labels.md`](issues/labels.md).
+
+## `init` command behavior
+
+- `gitlane init` creates `.gitlane/project.toml` when missing.
+- Default `name` is the target directory name.
+- `--name`, `--description`, and `--homepage` can be used during `init` to set or update those fields.

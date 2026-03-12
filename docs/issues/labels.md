@@ -57,7 +57,9 @@ If a label belongs to a group and does not define `color`, it inherits the group
 - Otherwise, if the label has `group` and `[label_groups].<group>.color` is set, the group color is inherited.
 - Otherwise, the label has no configured color.
 
-## Example `.gitlane/issues/labels.toml`
+## Default init labels
+
+`gitlane init` uses the following default `.gitlane/issues/labels.toml` when the file is missing:
 
 ```toml
 [label_groups]
@@ -66,8 +68,14 @@ type = { name = "Type", description = "Issue classification", color = "#334155" 
 [labels]
 type_bug = { name = "Bug", description = "Unexpected behavior", group = "type" }
 type_feature = { name = "Feature", description = "Net-new capability", group = "type" }
-docs = { name = "Docs", description = "Documentation updates", color = "#0f766e" }
+type_docs = { name = "Docs", description = "Documentation updates", group = "type" }
+type_chore = { name = "Chore", description = "Maintenance and tooling work", group = "type" }
+type_refactor = { name = "Refactor", description = "Internal structure improvements", group = "type" }
+
+blocked = { name = "Blocked", description = "Waiting on external dependency", color = "#b91c1c" }
+needs_decision = { name = "Needs Decision", description = "Requires product or technical decision", color = "#b45309" }
+good_first_issue = { name = "Good First Issue", description = "Suitable for new contributors", color = "#0369a1" }
 ```
 
-In this example, `type_bug` and `type_feature` are mutually exclusive because they are in the same `type` group, and
-both inherit color `#334155` from that group.
+In this example, all `type_*` labels are mutually exclusive because they are in the same `type` group, and they all
+inherit color `#334155` from that group.

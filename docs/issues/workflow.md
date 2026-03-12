@@ -88,7 +88,7 @@ Workflow state equals the `<state>` segment in the issue path.
 
 If an issue is stored at:
 
-`.gitlane/issues/in_progress/ISSUE-m8x4gn8/issue.md`
+`.gitlane/issues/in_progress/ISS-m8x4gn8/issue.md`
 
 Its state is `in_progress`.
 
@@ -100,7 +100,7 @@ Example:
 
 ```bash
 git mv \
-  .gitlane/issues/in_progress/ISSUE-m8x4gn8 \
+  .gitlane/issues/in_progress/ISS-m8x4gn8 \
   .gitlane/issues/review/
 ```
 

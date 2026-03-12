@@ -1,0 +1,10 @@
+issue_prefix = "ISS"
+
+priority_order = ["p1", "p2", "p3", "p4", "p0"]
+
+[priorities]
+p0 = { name = "No Priority", description = "Default when urgency is not assigned" }
+p1 = { name = "Urgent", description = "Needs immediate attention" }
+p2 = { name = "High", description = "Important and should be scheduled soon" }
+p3 = { name = "Medium", description = "Normal planned work" }
+p4 = { name = "Low", description = "Can be deferred" }

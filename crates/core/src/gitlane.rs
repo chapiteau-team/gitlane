@@ -1,14 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use thiserror::Error;
-
-use crate::project::{ProjectConfig, ProjectConfigError};
-
-#[derive(Debug, Error)]
-pub enum GitlaneError {
-    #[error(transparent)]
-    ProjectConfig(#[from] ProjectConfigError),
-}
+use crate::{
+    errors::GitlaneError,
+    init::{self, GitlaneInitError, InitOptions},
+    project::ProjectConfig,
+};
 
 #[derive(Debug, Clone)]
 pub struct Gitlane {
@@ -27,6 +23,14 @@ impl Gitlane {
         })
     }
 
+    pub fn init(
+        project_path: impl Into<PathBuf>,
+        options: InitOptions,
+    ) -> Result<Self, GitlaneInitError> {
+        let project_path = init::initialize(project_path, options)?;
+        Ok(Self::new(project_path)?)
+    }
+
     pub fn project_path(&self) -> &Path {
         &self.project_path
     }
@@ -43,10 +47,13 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    use crate::paths::PROJECT_CONFIG_FILE;
+    use crate::{
+        paths::{GITLANE_DIR, PROJECT_CONFIG_FILE},
+        project::ProjectConfigError,
+    };
 
     fn create_project_dir(base: &Path, config: &str) -> PathBuf {
-        let gitlane_dir = base.join(".gitlane");
+        let gitlane_dir = base.join(GITLANE_DIR);
         fs::create_dir_all(&gitlane_dir).expect(".gitlane directory should be created");
         fs::write(gitlane_dir.join(PROJECT_CONFIG_FILE), config)
             .expect("project config should be created");
@@ -88,6 +95,35 @@ name = ""
         assert!(matches!(
             err,
             GitlaneError::ProjectConfig(ProjectConfigError::EmptyName)
+        ));
+    }
+
+    #[test]
+    fn init_checks_initialized_project_can_be_loaded() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let _gitlane_dir = create_project_dir(
+            temp_dir.path(),
+            r#"
+name = ""
+"#,
+        );
+
+        let err = Gitlane::init(
+            temp_dir.path().join(GITLANE_DIR),
+            InitOptions {
+                name: None,
+                default_name: "ignored".to_owned(),
+                description: None,
+                homepage: None,
+            },
+        )
+        .expect_err("invalid existing project config should fail");
+
+        assert!(matches!(
+            err,
+            GitlaneInitError::LoadService(GitlaneError::ProjectConfig(
+                ProjectConfigError::EmptyName
+            ))
         ));
     }
 }

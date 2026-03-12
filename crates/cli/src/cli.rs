@@ -19,7 +19,7 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    Init,
+    Init(InitArgs),
     Validate,
     Issue {
         #[command(subcommand)]
@@ -33,6 +33,18 @@ pub enum Command {
         #[command(subcommand)]
         command: LabelCommand,
     },
+}
+
+#[derive(Debug, Args)]
+pub struct InitArgs {
+    #[arg(long)]
+    pub name: Option<String>,
+
+    #[arg(long)]
+    pub description: Option<String>,
+
+    #[arg(long)]
+    pub homepage: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]

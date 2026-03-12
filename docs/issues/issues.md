@@ -14,7 +14,7 @@ Issue configuration lives in:
 
 ### Required top-level fields
 
-- `issue_prefix`: prefix used in issue identifiers and issue directory names (for example, `ISSUE`).
+- `issue_prefix`: prefix used in issue identifiers and issue directory names (for example, `ISS`).
 - `priorities`: map of priority id to priority config.
 - `priority_order`: ordered list of priority ids from highest to lowest.
 
@@ -52,7 +52,7 @@ In this scheme, `p1` is the highest priority and `p0` is the lowest priority.
 ### Example `.gitlane/issues/issues.toml`
 
 ```toml
-issue_prefix = "ISSUE"
+issue_prefix = "ISS"
 
 priority_order = ["p1", "p2", "p3", "p4", "p0"]
 
@@ -124,7 +124,7 @@ updated_at = "2026-02-27T10:08:15Z"
 reporter = "@kalaninja"
 assignees = []
 priority = "p2"
-labels = ["docs"]
+labels = ["type_docs"]
 +++
 
 Any Markdown content is valid here.

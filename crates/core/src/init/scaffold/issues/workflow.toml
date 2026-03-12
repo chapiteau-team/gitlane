@@ -1,0 +1,17 @@
+initial_state = "todo"
+
+[states]
+todo = { name = "To Do" }
+in_progress = { name = "In Progress" }
+review = { name = "In Review" }
+done = { name = "Done" }
+
+[transitions.todo]
+start_work = { name = "Start work", to = "in_progress" }
+
+[transitions.in_progress]
+request_review = { name = "Request review", to = "review" }
+
+[transitions.review]
+approve = { name = "Approve", to = "done" }
+request_changes = { name = "Request changes", to = "in_progress" }
