@@ -11,6 +11,12 @@ pub enum FsError {
     ExpectedDirectory { path: PathBuf },
     #[error("expected file at `{path}`")]
     ExpectedFile { path: PathBuf },
+    #[error("failed to read `{path}`")]
+    ReadFile {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error("failed to create directory `{path}`")]
     CreateDirectory {
         path: PathBuf,
@@ -42,21 +48,37 @@ pub fn ensure_directory(path: &Path) -> Result<(), FsError> {
     })
 }
 
-pub fn write_file_if_missing(path: &Path, content: &str) -> Result<(), FsError> {
-    if path.exists() {
-        if path.is_file() {
-            return Ok(());
-        }
-
-        return Err(FsError::ExpectedFile {
-            path: path.to_path_buf(),
-        });
+pub(crate) fn ensure_file(path: &Path) -> Result<(), FsError> {
+    if path.is_file() {
+        return Ok(());
     }
 
+    Err(FsError::ExpectedFile {
+        path: path.to_path_buf(),
+    })
+}
+
+pub(crate) fn read_text_file(path: &Path) -> Result<String, FsError> {
+    fs::read_to_string(path).map_err(|source| FsError::ReadFile {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+pub(crate) fn write_text_file(path: &Path, content: &str) -> Result<(), FsError> {
     fs::write(path, content).map_err(|source| FsError::WriteFile {
         path: path.to_path_buf(),
         source,
     })
+}
+
+pub fn write_file_if_missing(path: &Path, content: &str) -> Result<(), FsError> {
+    if path.exists() {
+        ensure_file(path)?;
+        return Ok(());
+    }
+
+    write_text_file(path, content)
 }
 
 #[cfg(test)]
@@ -97,6 +119,26 @@ mod tests {
 
         let content = fs::read_to_string(&file_path).expect("file should be readable");
         assert_eq!(content, "first\n");
+    }
+
+    #[test]
+    fn ensure_file_accepts_existing_file() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let file_path = temp_dir.path().join("config.toml");
+        fs::write(&file_path, "name = \"gitlane\"\n").expect("file should be created");
+
+        ensure_file(&file_path).expect("existing file should pass");
+    }
+
+    #[test]
+    fn ensure_file_errors_when_path_is_directory() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let dir_path = temp_dir.path().join("config");
+        fs::create_dir_all(&dir_path).expect("directory should be created");
+
+        let err = ensure_file(&dir_path).expect_err("directory path should fail");
+
+        assert!(matches!(err, FsError::ExpectedFile { .. }));
     }
 
     #[test]

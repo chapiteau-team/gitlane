@@ -1,35 +1,11 @@
-use std::{
-    collections::HashSet,
-    fs,
-    path::{Path, PathBuf},
+use std::{collections::HashSet, path::Path};
+
+use crate::{
+    errors::{GitlaneError, PersonHandleError},
+    fs::read_text_file,
+    paths::PROJECT_CONFIG_FILE,
 };
-
 use serde::Deserialize;
-use thiserror::Error;
-
-use crate::paths::PROJECT_CONFIG_FILE;
-
-#[derive(Debug, Error)]
-pub enum ProjectConfigError {
-    #[error("failed to read `{path}`")]
-    ReadFile {
-        path: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
-    #[error("failed to parse project config `{path}`")]
-    ParseFile {
-        path: PathBuf,
-        #[source]
-        source: toml::de::Error,
-    },
-    #[error("`name` must be a non-empty string")]
-    EmptyName,
-    #[error("`people[{index}]` must be a non-empty handle")]
-    EmptyPersonHandle { index: usize },
-    #[error("duplicate handle `{handle}` in `people`")]
-    DuplicatePersonHandle { handle: String },
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectConfig {
@@ -40,16 +16,12 @@ pub struct ProjectConfig {
 }
 
 impl ProjectConfig {
-    pub fn load(project_dir: impl AsRef<Path>) -> Result<Self, ProjectConfigError> {
+    pub fn load(project_dir: impl AsRef<Path>) -> Result<Self, GitlaneError> {
         let config_path = project_dir.as_ref().join(PROJECT_CONFIG_FILE);
-        let content =
-            fs::read_to_string(&config_path).map_err(|source| ProjectConfigError::ReadFile {
-                path: config_path.clone(),
-                source,
-            })?;
+        let content = read_text_file(&config_path)?;
 
         let raw: RawProjectConfig =
-            toml::from_str(&content).map_err(|source| ProjectConfigError::ParseFile {
+            toml::from_str(&content).map_err(|source| GitlaneError::ParseToml {
                 path: config_path,
                 source,
             })?;
@@ -73,22 +45,23 @@ impl ProjectConfig {
         &self.people
     }
 
-    fn from_raw(raw: RawProjectConfig) -> Result<Self, ProjectConfigError> {
+    fn from_raw(raw: RawProjectConfig) -> Result<Self, GitlaneError> {
         if raw.name.trim().is_empty() {
-            return Err(ProjectConfigError::EmptyName);
+            return Err(GitlaneError::InvalidProjectName);
         }
 
         let people = raw.people.unwrap_or_default();
         let mut seen = HashSet::with_capacity(people.len());
         for (index, handle) in people.iter().enumerate() {
             if handle.trim().is_empty() {
-                return Err(ProjectConfigError::EmptyPersonHandle { index });
+                return Err(PersonHandleError::Empty { index }.into());
             }
 
             if !seen.insert(handle) {
-                return Err(ProjectConfigError::DuplicatePersonHandle {
+                return Err(PersonHandleError::Duplicate {
                     handle: handle.clone(),
-                });
+                }
+                .into());
             }
         }
 
@@ -113,7 +86,7 @@ struct RawProjectConfig {
 mod tests {
     use super::*;
 
-    fn parse_project_config(content: &str) -> Result<ProjectConfig, ProjectConfigError> {
+    fn parse_project_config(content: &str) -> Result<ProjectConfig, GitlaneError> {
         let raw: RawProjectConfig =
             toml::from_str(content).expect("test project config snippets should be valid TOML");
         ProjectConfig::from_raw(raw)
@@ -171,7 +144,7 @@ name = ""
         )
         .expect_err("empty name should be rejected");
 
-        assert!(matches!(err, ProjectConfigError::EmptyName));
+        assert!(matches!(err, GitlaneError::InvalidProjectName));
     }
 
     #[test]
@@ -186,7 +159,7 @@ people = ["@alice", ""]
 
         assert!(matches!(
             err,
-            ProjectConfigError::EmptyPersonHandle { index: 1 }
+            GitlaneError::InvalidPersonHandle(PersonHandleError::Empty { index: 1 })
         ));
     }
 
@@ -202,7 +175,8 @@ people = ["@alice", "@alice"]
 
         assert!(matches!(
             err,
-            ProjectConfigError::DuplicatePersonHandle { ref handle } if handle == "@alice"
+            GitlaneError::InvalidPersonHandle(PersonHandleError::Duplicate { ref handle })
+                if handle == "@alice"
         ));
     }
 

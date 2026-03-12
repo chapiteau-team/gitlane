@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::{
     errors::GitlaneError,
-    init::{self, GitlaneInitError, InitOptions},
+    init::{self, InitOptions},
     project::ProjectConfig,
 };
 
@@ -26,9 +26,9 @@ impl Gitlane {
     pub fn init(
         project_path: impl Into<PathBuf>,
         options: InitOptions,
-    ) -> Result<Self, GitlaneInitError> {
+    ) -> Result<Self, GitlaneError> {
         let project_path = init::initialize(project_path, options)?;
-        Ok(Self::load(project_path)?)
+        Self::load(project_path)
     }
 
     pub fn project_path(&self) -> &Path {
@@ -47,10 +47,7 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    use crate::{
-        paths::{GITLANE_DIR, PROJECT_CONFIG_FILE},
-        project::ProjectConfigError,
-    };
+    use crate::paths::{GITLANE_DIR, PROJECT_CONFIG_FILE};
 
     fn create_project_dir(base: &Path, config: &str) -> PathBuf {
         let gitlane_dir = base.join(GITLANE_DIR);
@@ -92,10 +89,7 @@ name = ""
         );
 
         let err = Gitlane::load(project_dir).expect_err("invalid config should fail");
-        assert!(matches!(
-            err,
-            GitlaneError::ProjectConfig(ProjectConfigError::EmptyName)
-        ));
+        assert!(matches!(err, GitlaneError::InvalidProjectName));
     }
 
     #[test]
@@ -119,11 +113,6 @@ name = ""
         )
         .expect_err("invalid existing project config should fail");
 
-        assert!(matches!(
-            err,
-            GitlaneInitError::LoadService(GitlaneError::ProjectConfig(
-                ProjectConfigError::EmptyName
-            ))
-        ));
+        assert!(matches!(err, GitlaneError::InvalidProjectName));
     }
 }

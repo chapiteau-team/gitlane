@@ -1,14 +1,10 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
-use thiserror::Error;
 use toml::{Table, Value};
 
 use crate::{
     errors::GitlaneError,
-    fs::{FsError, ensure_directory, write_file_if_missing},
+    fs::{ensure_directory, ensure_file, read_text_file, write_file_if_missing, write_text_file},
     paths::{
         ISSUES_CONFIG_FILE, ISSUES_DIR, ISSUES_LABELS_FILE, ISSUES_WORKFLOW_FILE,
         PROJECT_CONFIG_FILE,
@@ -39,40 +35,10 @@ impl InitOptions {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum GitlaneInitError {
-    #[error("`--name` must be a non-empty string")]
-    EmptyNameArgument,
-    #[error("default project name must be a non-empty string")]
-    EmptyDefaultName,
-    #[error("failed to read `{path}`")]
-    ReadFile {
-        path: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
-    #[error("failed to parse `{path}` as TOML")]
-    ParseToml {
-        path: PathBuf,
-        #[source]
-        source: toml::de::Error,
-    },
-    #[error("failed to serialize TOML for `{path}`")]
-    SerializeToml {
-        path: PathBuf,
-        #[source]
-        source: toml::ser::Error,
-    },
-    #[error(transparent)]
-    Filesystem(#[from] FsError),
-    #[error(transparent)]
-    LoadService(#[from] GitlaneError),
-}
-
 pub(crate) fn initialize(
     project_path: impl Into<PathBuf>,
     options: InitOptions,
-) -> Result<PathBuf, GitlaneInitError> {
+) -> Result<PathBuf, GitlaneError> {
     let project_path = project_path.into();
     ensure_directory(&project_path)?;
     initialize_issues(&project_path)?;
@@ -81,7 +47,7 @@ pub(crate) fn initialize(
     Ok(project_path)
 }
 
-fn initialize_issues(project_path: &Path) -> Result<(), GitlaneInitError> {
+fn initialize_issues(project_path: &Path) -> Result<(), GitlaneError> {
     let issues_dir = project_path.join(ISSUES_DIR);
     ensure_directory(&issues_dir)?;
 
@@ -96,18 +62,10 @@ fn initialize_issues(project_path: &Path) -> Result<(), GitlaneInitError> {
     Ok(())
 }
 
-fn ensure_project_config(
-    project_path: &Path,
-    options: InitOptions,
-) -> Result<(), GitlaneInitError> {
+fn ensure_project_config(project_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
     let config_path = project_path.join(PROJECT_CONFIG_FILE);
     if config_path.exists() {
-        if !config_path.is_file() {
-            return Err(FsError::ExpectedFile {
-                path: config_path.clone(),
-            }
-            .into());
-        }
+        ensure_file(&config_path)?;
 
         if options.updates_project_config() {
             update_project_config(&config_path, options)?;
@@ -123,28 +81,15 @@ fn ensure_project_config(
         homepage,
     } = options;
 
-    let name = match name {
-        Some(name) => {
-            validate_explicit_name(&name)?;
-            name
-        }
-        None => {
-            validate_default_name(&default_name)?;
-            default_name
-        }
-    };
+    let name = name.unwrap_or(default_name);
+    validate_project_name(&name)?;
 
     let content = render_project_toml(&name, description.as_deref(), homepage.as_deref());
-    fs::write(&config_path, content).map_err(|source| {
-        FsError::WriteFile {
-            path: config_path,
-            source,
-        }
-        .into()
-    })
+    write_text_file(&config_path, &content)?;
+    Ok(())
 }
 
-fn update_project_config(config_path: &Path, options: InitOptions) -> Result<(), GitlaneInitError> {
+fn update_project_config(config_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
     let InitOptions {
         name,
         default_name: _,
@@ -152,41 +97,27 @@ fn update_project_config(config_path: &Path, options: InitOptions) -> Result<(),
         homepage,
     } = options;
 
-    let content = fs::read_to_string(config_path).map_err(|source| GitlaneInitError::ReadFile {
+    let content = read_text_file(config_path)?;
+
+    let mut table: Table = content.parse().map_err(|source| GitlaneError::ParseToml {
         path: config_path.to_path_buf(),
         source,
     })?;
 
-    let mut table: Table = content
-        .parse()
-        .map_err(|source| GitlaneInitError::ParseToml {
-            path: config_path.to_path_buf(),
-            source,
-        })?;
-
-    let mut changed = false;
-    if let Some(name) = name {
-        validate_explicit_name(&name)?;
-        table.insert("name".to_owned(), Value::String(name));
-        changed = true;
+    if let Some(name) = name.as_deref() {
+        validate_project_name(name)?;
     }
 
-    if let Some(description) = description {
-        table.insert("description".to_owned(), Value::String(description));
-        changed = true;
-    }
-
-    if let Some(homepage) = homepage {
-        table.insert("homepage".to_owned(), Value::String(homepage));
-        changed = true;
-    }
+    let mut changed = insert_optional_string_field(&mut table, "name", name);
+    changed |= insert_optional_string_field(&mut table, "description", description);
+    changed |= insert_optional_string_field(&mut table, "homepage", homepage);
 
     if !changed {
         return Ok(());
     }
 
     let mut serialized =
-        toml::to_string_pretty(&table).map_err(|source| GitlaneInitError::SerializeToml {
+        toml::to_string_pretty(&table).map_err(|source| GitlaneError::SerializeToml {
             path: config_path.to_path_buf(),
             source,
         })?;
@@ -194,13 +125,17 @@ fn update_project_config(config_path: &Path, options: InitOptions) -> Result<(),
         serialized.push('\n');
     }
 
-    fs::write(config_path, serialized).map_err(|source| {
-        FsError::WriteFile {
-            path: config_path.to_path_buf(),
-            source,
-        }
-        .into()
-    })
+    write_text_file(config_path, &serialized)?;
+    Ok(())
+}
+
+fn insert_optional_string_field(table: &mut Table, key: &str, value: Option<String>) -> bool {
+    if let Some(value) = value {
+        table.insert(key.to_owned(), Value::String(value));
+        return true;
+    }
+
+    false
 }
 
 fn render_project_toml(name: &str, description: Option<&str>, homepage: Option<&str>) -> String {
@@ -220,17 +155,9 @@ fn render_project_toml(name: &str, description: Option<&str>, homepage: Option<&
     format!("{}\n", lines.join("\n"))
 }
 
-fn validate_explicit_name(name: &str) -> Result<(), GitlaneInitError> {
+fn validate_project_name(name: &str) -> Result<(), GitlaneError> {
     if name.trim().is_empty() {
-        return Err(GitlaneInitError::EmptyNameArgument);
-    }
-
-    Ok(())
-}
-
-fn validate_default_name(name: &str) -> Result<(), GitlaneInitError> {
-    if name.trim().is_empty() {
-        return Err(GitlaneInitError::EmptyDefaultName);
+        return Err(GitlaneError::InvalidProjectName);
     }
 
     Ok(())
@@ -239,6 +166,8 @@ fn validate_default_name(name: &str) -> Result<(), GitlaneInitError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::fs;
 
     use crate::{
         paths::{
@@ -398,7 +327,7 @@ mod tests {
         )
         .expect_err("empty name should fail");
 
-        assert!(matches!(err, GitlaneInitError::EmptyNameArgument));
+        assert!(matches!(err, GitlaneError::InvalidProjectName));
     }
 
     #[test]
@@ -407,7 +336,7 @@ mod tests {
         let err = initialize(temp_dir.path().join(GITLANE_DIR), default_options("   "))
             .expect_err("empty default name should fail");
 
-        assert!(matches!(err, GitlaneInitError::EmptyDefaultName));
+        assert!(matches!(err, GitlaneError::InvalidProjectName));
     }
 
     #[test]
