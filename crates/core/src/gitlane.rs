@@ -6,6 +6,10 @@ use crate::{
     project::ProjectConfig,
 };
 
+/// Core service for interacting with project metadata and lifecycle.
+///
+/// A `Gitlane` instance stores the project directory path and validated
+/// configuration loaded from `project.toml`.
 #[derive(Debug, Clone)]
 pub struct Gitlane {
     project_path: PathBuf,
@@ -13,6 +17,9 @@ pub struct Gitlane {
 }
 
 impl Gitlane {
+    /// Load an existing project from `project_path`.
+    ///
+    /// This reads and validates `project.toml` in the provided directory.
     pub fn load(project_path: PathBuf) -> Result<Self, GitlaneError> {
         let project_config = ProjectConfig::load(&project_path)?;
 
@@ -22,15 +29,20 @@ impl Gitlane {
         })
     }
 
+    /// Initialize a project at `project_path`, then load it.
+    ///
+    /// Initialization behavior is controlled by `options`.
     pub fn init(project_path: PathBuf, options: InitOptions) -> Result<Self, GitlaneError> {
         init::initialize(&project_path, options)?;
         Self::load(project_path)
     }
 
+    /// Return the project directory used by this service instance.
     pub fn project_path(&self) -> &Path {
         &self.project_path
     }
 
+    /// Return validated project metadata loaded for this instance.
     pub fn project_config(&self) -> &ProjectConfig {
         &self.project_config
     }
