@@ -7,6 +7,7 @@ use crate::{
 };
 use serde::Deserialize;
 
+/// Parsed project metadata loaded from `project.toml`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectConfig {
     name: String,
@@ -16,6 +17,12 @@ pub struct ProjectConfig {
 }
 
 impl ProjectConfig {
+    /// Load and validate project configuration from `project.toml` in `project_dir`.
+    ///
+    /// Validation rules:
+    /// - `name` must be non-empty after trimming whitespace.
+    /// - each `people` handle must be non-empty after trimming whitespace.
+    /// - `people` handles must be unique while preserving their input order.
     pub fn load(project_dir: &Path) -> Result<Self, GitlaneError> {
         let config_path = project_dir.join(PROJECT_CONFIG_FILE);
         let content = read_text_file(&config_path)?;
@@ -29,22 +36,29 @@ impl ProjectConfig {
         Self::from_raw(raw)
     }
 
+    /// Return the project display name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Return the optional project description.
     pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
 
+    /// Return the optional homepage URL string.
     pub fn homepage(&self) -> Option<&str> {
         self.homepage.as_deref()
     }
 
+    /// Return the ordered list of unique person handles.
     pub fn people(&self) -> &[String] {
         &self.people
     }
 
+    /// Convert deserialized TOML into validated project metadata.
+    ///
+    /// This enforces the same invariants as [`ProjectConfig::load`].
     fn from_raw(raw: RawProjectConfig) -> Result<Self, GitlaneError> {
         if raw.name.trim().is_empty() {
             return Err(GitlaneError::InvalidProjectName);
@@ -74,6 +88,7 @@ impl ProjectConfig {
     }
 }
 
+/// Unvalidated representation parsed directly from TOML.
 #[derive(Debug, Deserialize)]
 struct RawProjectConfig {
     name: String,
