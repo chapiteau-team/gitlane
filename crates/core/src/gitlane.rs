@@ -31,7 +31,8 @@ impl Gitlane {
 
     /// Initialize a project at `project_path`, then load it.
     ///
-    /// Initialization behavior is controlled by `options`.
+    /// See [`InitOptions`] for initialization behavior and metadata
+    /// updates.
     pub fn init(project_path: PathBuf, options: InitOptions) -> Result<Self, GitlaneError> {
         init::initialize(&project_path, options)?;
         Self::load(project_path)

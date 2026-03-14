@@ -1,3 +1,8 @@
+//! Project initialization routines.
+//!
+//! Initialization ensures the target directory exists, scaffolds issue
+//! workflow/config/label files, and creates or updates `project.toml`.
+
 use std::path::Path;
 
 use toml::{Table, Value};
@@ -21,20 +26,34 @@ const ISSUES_SCAFFOLD_FILES: [(&str, &str); 3] = [
     (ISSUES_LABELS_FILE, ISSUES_LABELS_TOML),
 ];
 
+/// Options that control project initialization and metadata updates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InitOptions {
+    /// Explicit project name.
+    ///
+    /// When provided, this is used for new configs and updates existing
+    /// configs.
     pub name: Option<String>,
+    /// Fallback name used only when creating a new config and `name` is not
+    /// provided.
     pub default_name: String,
+    /// Optional project description to set on create or update.
     pub description: Option<String>,
+    /// Optional homepage URL string to set on create or update.
     pub homepage: Option<String>,
 }
 
 impl InitOptions {
+    /// Return whether these options request metadata updates.
     fn updates_project_config(&self) -> bool {
         self.name.is_some() || self.description.is_some() || self.homepage.is_some()
     }
 }
 
+/// Initialize project artifacts at `project_path`.
+///
+/// This creates missing directories, scaffolds issue files, and ensures a
+/// valid `project.toml` exists.
 pub(crate) fn initialize(project_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
     ensure_directory(project_path)?;
     initialize_issues(project_path)?;
@@ -43,6 +62,7 @@ pub(crate) fn initialize(project_path: &Path, options: InitOptions) -> Result<()
     Ok(())
 }
 
+/// Ensure issue directories and default scaffold files exist.
 fn initialize_issues(project_path: &Path) -> Result<(), GitlaneError> {
     let issues_dir = project_path.join(ISSUES_DIR);
     ensure_directory(&issues_dir)?;
@@ -58,6 +78,7 @@ fn initialize_issues(project_path: &Path) -> Result<(), GitlaneError> {
     Ok(())
 }
 
+/// Ensure `project.toml` exists, creating or updating it as needed.
 fn ensure_project_config(project_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
     let config_path = project_path.join(PROJECT_CONFIG_FILE);
     if config_path.exists() {
@@ -85,6 +106,7 @@ fn ensure_project_config(project_path: &Path, options: InitOptions) -> Result<()
     Ok(())
 }
 
+/// Apply metadata updates to an existing `project.toml`.
 fn update_project_config(config_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
     let InitOptions {
         name,
@@ -125,6 +147,9 @@ fn update_project_config(config_path: &Path, options: InitOptions) -> Result<(),
     Ok(())
 }
 
+/// Insert a string field only when `value` is present.
+///
+/// Returns `true` when the table was modified.
 fn insert_optional_string_field(table: &mut Table, key: &str, value: Option<String>) -> bool {
     if let Some(value) = value {
         table.insert(key.to_owned(), Value::String(value));
@@ -134,6 +159,7 @@ fn insert_optional_string_field(table: &mut Table, key: &str, value: Option<Stri
     false
 }
 
+/// Render a minimal `project.toml` document from validated metadata.
 fn render_project_toml(name: &str, description: Option<&str>, homepage: Option<&str>) -> String {
     let mut lines = vec![format!("name = {}", Value::String(name.to_owned()))];
 
@@ -151,6 +177,7 @@ fn render_project_toml(name: &str, description: Option<&str>, homepage: Option<&
     format!("{}\n", lines.join("\n"))
 }
 
+/// Validate that project names are not empty or whitespace-only.
 fn validate_project_name(name: &str) -> Result<(), GitlaneError> {
     if name.trim().is_empty() {
         return Err(GitlaneError::InvalidProjectName);
