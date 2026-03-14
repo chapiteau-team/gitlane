@@ -47,14 +47,13 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    use crate::paths::{GITLANE_DIR, PROJECT_CONFIG_FILE};
+    use crate::paths::PROJECT_CONFIG_FILE;
 
-    fn create_project_dir(base: &Path, config: &str) -> PathBuf {
-        let gitlane_dir = base.join(GITLANE_DIR);
-        fs::create_dir_all(&gitlane_dir).expect(".gitlane directory should be created");
-        fs::write(gitlane_dir.join(PROJECT_CONFIG_FILE), config)
+    fn create_project_dir(project_dir: &Path, config: &str) -> PathBuf {
+        fs::create_dir_all(project_dir).expect("project directory should be created");
+        fs::write(project_dir.join(PROJECT_CONFIG_FILE), config)
             .expect("project config should be created");
-        gitlane_dir
+        project_dir.to_path_buf()
     }
 
     #[test]
@@ -95,7 +94,7 @@ name = ""
     #[test]
     fn init_checks_initialized_project_can_be_loaded() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let _gitlane_dir = create_project_dir(
+        let _project_dir = create_project_dir(
             temp_dir.path(),
             r#"
 name = ""
@@ -103,7 +102,7 @@ name = ""
         );
 
         let err = Gitlane::init(
-            temp_dir.path().join(GITLANE_DIR),
+            temp_dir.path().to_path_buf(),
             InitOptions {
                 name: None,
                 default_name: "ignored".to_owned(),

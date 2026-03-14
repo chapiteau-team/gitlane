@@ -171,7 +171,7 @@ mod tests {
 
     use crate::{
         paths::{
-            GITLANE_DIR, ISSUES_CONFIG_FILE, ISSUES_DIR, ISSUES_LABELS_FILE, ISSUES_WORKFLOW_FILE,
+            ISSUES_CONFIG_FILE, ISSUES_DIR, ISSUES_LABELS_FILE, ISSUES_WORKFLOW_FILE,
             PROJECT_CONFIG_FILE,
         },
         project::ProjectConfig,
@@ -203,8 +203,9 @@ mod tests {
     #[test]
     fn initialize_creates_full_project_layout() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let expected_path = temp_dir.path().to_path_buf();
         let project_path = initialize(
-            temp_dir.path().join(GITLANE_DIR),
+            expected_path.clone(),
             InitOptions {
                 name: Some("My Project".to_owned()),
                 default_name: "Ignored".to_owned(),
@@ -214,7 +215,7 @@ mod tests {
         )
         .expect("init should succeed");
 
-        assert_eq!(project_path, temp_dir.path().join(GITLANE_DIR));
+        assert_eq!(project_path, expected_path);
 
         let config = ProjectConfig::load(&project_path).expect("project config should load");
         assert_eq!(config.name(), "My Project");
@@ -235,11 +236,8 @@ mod tests {
     #[test]
     fn initialize_uses_default_name_when_explicit_name_missing() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let project_path = initialize(
-            temp_dir.path().join(GITLANE_DIR),
-            default_options("Fallback"),
-        )
-        .expect("init should succeed");
+        let project_path = initialize(temp_dir.path().to_path_buf(), default_options("Fallback"))
+            .expect("init should succeed");
 
         let config = ProjectConfig::load(&project_path).expect("project config should load");
         assert_eq!(config.name(), "Fallback");
@@ -248,22 +246,22 @@ mod tests {
     #[test]
     fn initialize_creates_missing_artifacts_without_overwriting_existing_files() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let gitlane_dir = temp_dir.path().join(GITLANE_DIR);
-        let issues_dir = gitlane_dir.join(ISSUES_DIR);
+        let existing_project_path = temp_dir.path().to_path_buf();
+        let issues_dir = existing_project_path.join(ISSUES_DIR);
         fs::create_dir_all(&issues_dir).expect("issues directory should be created");
 
-        let workflow_path = issues_file_path(&gitlane_dir, ISSUES_WORKFLOW_FILE);
+        let workflow_path = issues_file_path(&existing_project_path, ISSUES_WORKFLOW_FILE);
         let custom_workflow =
             "initial_state = \"custom\"\n[states]\ncustom = { name = \"Custom\" }\n";
         fs::write(&workflow_path, custom_workflow).expect("workflow config should be written");
 
         fs::write(
-            gitlane_dir.join(PROJECT_CONFIG_FILE),
+            existing_project_path.join(PROJECT_CONFIG_FILE),
             "name = \"Existing\"\ncustom = \"keep\"\n",
         )
         .expect("project config should be written");
 
-        let project_path = initialize(gitlane_dir.clone(), default_options("Unused"))
+        let project_path = initialize(existing_project_path.clone(), default_options("Unused"))
             .expect("init should succeed");
 
         let config = ProjectConfig::load(&project_path).expect("project config should load");
@@ -284,8 +282,7 @@ mod tests {
     #[test]
     fn initialize_updates_existing_project_metadata_fields() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let project_path = temp_dir.path().join(GITLANE_DIR);
-        fs::create_dir_all(&project_path).expect("project directory should be created");
+        let project_path = temp_dir.path().to_path_buf();
         fs::write(
             project_path.join(PROJECT_CONFIG_FILE),
             "name = \"Existing\"\ncustom = \"keep\"\n",
@@ -317,7 +314,7 @@ mod tests {
     fn initialize_rejects_empty_name_argument() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let err = initialize(
-            temp_dir.path().join(GITLANE_DIR),
+            temp_dir.path().to_path_buf(),
             InitOptions {
                 name: Some("   ".to_owned()),
                 default_name: "fallback".to_owned(),
@@ -333,7 +330,7 @@ mod tests {
     #[test]
     fn initialize_rejects_empty_default_name_when_name_is_missing() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let err = initialize(temp_dir.path().join(GITLANE_DIR), default_options("   "))
+        let err = initialize(temp_dir.path().to_path_buf(), default_options("   "))
             .expect_err("empty default name should fail");
 
         assert!(matches!(err, GitlaneError::InvalidProjectName));
