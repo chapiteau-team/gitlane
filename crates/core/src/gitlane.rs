@@ -13,8 +13,7 @@ pub struct Gitlane {
 }
 
 impl Gitlane {
-    pub fn load(project_path: impl Into<PathBuf>) -> Result<Self, GitlaneError> {
-        let project_path = project_path.into();
+    pub fn load(project_path: PathBuf) -> Result<Self, GitlaneError> {
         let project_config = ProjectConfig::load(&project_path)?;
 
         Ok(Self {
@@ -23,11 +22,8 @@ impl Gitlane {
         })
     }
 
-    pub fn init(
-        project_path: impl Into<PathBuf>,
-        options: InitOptions,
-    ) -> Result<Self, GitlaneError> {
-        let project_path = init::initialize(project_path, options)?;
+    pub fn init(project_path: PathBuf, options: InitOptions) -> Result<Self, GitlaneError> {
+        init::initialize(&project_path, options)?;
         Self::load(project_path)
     }
 
@@ -67,9 +63,9 @@ people = ["@alice", "@bob"]
 "#,
         );
 
-        let service = Gitlane::load(project_dir.clone()).expect("service should initialize");
+        let service = Gitlane::load(project_dir).expect("service should initialize");
 
-        assert_eq!(service.project_path(), project_dir);
+        assert_eq!(service.project_path(), temp_dir.path());
         assert_eq!(service.project_config().name(), "Gitlane");
         assert_eq!(
             service.project_config().people(),
@@ -94,7 +90,7 @@ name = ""
     #[test]
     fn init_checks_initialized_project_can_be_loaded() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let _project_dir = create_project_dir(
+        let project_dir = create_project_dir(
             temp_dir.path(),
             r#"
 name = ""
@@ -102,7 +98,7 @@ name = ""
         );
 
         let err = Gitlane::init(
-            temp_dir.path().to_path_buf(),
+            project_dir,
             InitOptions {
                 name: None,
                 default_name: "ignored".to_owned(),

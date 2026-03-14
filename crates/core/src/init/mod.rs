@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use toml::{Table, Value};
 
@@ -35,16 +35,12 @@ impl InitOptions {
     }
 }
 
-pub(crate) fn initialize(
-    project_path: impl Into<PathBuf>,
-    options: InitOptions,
-) -> Result<PathBuf, GitlaneError> {
-    let project_path = project_path.into();
-    ensure_directory(&project_path)?;
-    initialize_issues(&project_path)?;
-    ensure_project_config(&project_path, options)?;
+pub(crate) fn initialize(project_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
+    ensure_directory(project_path)?;
+    initialize_issues(project_path)?;
+    ensure_project_config(project_path, options)?;
 
-    Ok(project_path)
+    Ok(())
 }
 
 fn initialize_issues(project_path: &Path) -> Result<(), GitlaneError> {
@@ -167,7 +163,7 @@ fn validate_project_name(name: &str) -> Result<(), GitlaneError> {
 mod tests {
     use super::*;
 
-    use std::fs;
+    use std::{fs, path::PathBuf};
 
     use crate::{
         paths::{
@@ -203,9 +199,9 @@ mod tests {
     #[test]
     fn initialize_creates_full_project_layout() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let expected_path = temp_dir.path().to_path_buf();
-        let project_path = initialize(
-            expected_path.clone(),
+        let project_path = temp_dir.path();
+        initialize(
+            project_path,
             InitOptions {
                 name: Some("My Project".to_owned()),
                 default_name: "Ignored".to_owned(),
@@ -215,42 +211,39 @@ mod tests {
         )
         .expect("init should succeed");
 
-        assert_eq!(project_path, expected_path);
-
-        let config = ProjectConfig::load(&project_path).expect("project config should load");
+        let config = ProjectConfig::load(project_path).expect("project config should load");
         assert_eq!(config.name(), "My Project");
         assert_eq!(config.description(), Some("Git-native tracker"));
         assert_eq!(config.homepage(), Some("https://example.com"));
 
-        assert!(issues_file_path(&project_path, ISSUES_WORKFLOW_FILE).is_file());
-        assert!(issues_file_path(&project_path, ISSUES_CONFIG_FILE).is_file());
-        assert!(issues_file_path(&project_path, ISSUES_LABELS_FILE).is_file());
-        assert_issue_state_dirs_exist(&project_path);
+        assert!(issues_file_path(project_path, ISSUES_WORKFLOW_FILE).is_file());
+        assert!(issues_file_path(project_path, ISSUES_CONFIG_FILE).is_file());
+        assert!(issues_file_path(project_path, ISSUES_LABELS_FILE).is_file());
+        assert_issue_state_dirs_exist(project_path);
 
-        let labels_content =
-            fs::read_to_string(issues_file_path(&project_path, ISSUES_LABELS_FILE))
-                .expect("labels config should be readable");
+        let labels_content = fs::read_to_string(issues_file_path(project_path, ISSUES_LABELS_FILE))
+            .expect("labels config should be readable");
         assert!(labels_content.contains("type_docs"));
     }
 
     #[test]
     fn initialize_uses_default_name_when_explicit_name_missing() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let project_path = initialize(temp_dir.path().to_path_buf(), default_options("Fallback"))
-            .expect("init should succeed");
+        let project_path = temp_dir.path();
+        initialize(project_path, default_options("Fallback")).expect("init should succeed");
 
-        let config = ProjectConfig::load(&project_path).expect("project config should load");
+        let config = ProjectConfig::load(project_path).expect("project config should load");
         assert_eq!(config.name(), "Fallback");
     }
 
     #[test]
     fn initialize_creates_missing_artifacts_without_overwriting_existing_files() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let existing_project_path = temp_dir.path().to_path_buf();
+        let existing_project_path = temp_dir.path();
         let issues_dir = existing_project_path.join(ISSUES_DIR);
         fs::create_dir_all(&issues_dir).expect("issues directory should be created");
 
-        let workflow_path = issues_file_path(&existing_project_path, ISSUES_WORKFLOW_FILE);
+        let workflow_path = issues_file_path(existing_project_path, ISSUES_WORKFLOW_FILE);
         let custom_workflow =
             "initial_state = \"custom\"\n[states]\ncustom = { name = \"Custom\" }\n";
         fs::write(&workflow_path, custom_workflow).expect("workflow config should be written");
@@ -261,20 +254,20 @@ mod tests {
         )
         .expect("project config should be written");
 
-        let project_path = initialize(existing_project_path.clone(), default_options("Unused"))
-            .expect("init should succeed");
+        initialize(existing_project_path, default_options("Unused")).expect("init should succeed");
 
-        let config = ProjectConfig::load(&project_path).expect("project config should load");
+        let config =
+            ProjectConfig::load(existing_project_path).expect("project config should load");
         assert_eq!(config.name(), "Existing");
         assert_eq!(
             fs::read_to_string(&workflow_path).expect("workflow config should be readable"),
             custom_workflow
         );
-        assert!(issues_file_path(&project_path, ISSUES_CONFIG_FILE).is_file());
-        assert!(issues_file_path(&project_path, ISSUES_LABELS_FILE).is_file());
-        assert_issue_state_dirs_exist(&project_path);
+        assert!(issues_file_path(existing_project_path, ISSUES_CONFIG_FILE).is_file());
+        assert!(issues_file_path(existing_project_path, ISSUES_LABELS_FILE).is_file());
+        assert_issue_state_dirs_exist(existing_project_path);
 
-        let project_content = fs::read_to_string(project_path.join(PROJECT_CONFIG_FILE))
+        let project_content = fs::read_to_string(existing_project_path.join(PROJECT_CONFIG_FILE))
             .expect("project config should be readable");
         assert!(project_content.contains("custom = \"keep\""));
     }
@@ -282,14 +275,14 @@ mod tests {
     #[test]
     fn initialize_updates_existing_project_metadata_fields() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let project_path = temp_dir.path().to_path_buf();
+        let project_path = temp_dir.path();
         fs::write(
             project_path.join(PROJECT_CONFIG_FILE),
             "name = \"Existing\"\ncustom = \"keep\"\n",
         )
         .expect("project config should be written");
 
-        let project_path = initialize(
+        initialize(
             project_path,
             InitOptions {
                 name: Some("Renamed".to_owned()),
@@ -300,7 +293,7 @@ mod tests {
         )
         .expect("init should succeed");
 
-        let config = ProjectConfig::load(&project_path).expect("project config should load");
+        let config = ProjectConfig::load(project_path).expect("project config should load");
         assert_eq!(config.name(), "Renamed");
         assert_eq!(config.description(), Some("Updated description"));
         assert_eq!(config.homepage(), Some("https://example.com/project"));
@@ -314,7 +307,7 @@ mod tests {
     fn initialize_rejects_empty_name_argument() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let err = initialize(
-            temp_dir.path().to_path_buf(),
+            temp_dir.path(),
             InitOptions {
                 name: Some("   ".to_owned()),
                 default_name: "fallback".to_owned(),
@@ -330,7 +323,7 @@ mod tests {
     #[test]
     fn initialize_rejects_empty_default_name_when_name_is_missing() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let err = initialize(temp_dir.path().to_path_buf(), default_options("   "))
+        let err = initialize(temp_dir.path(), default_options("   "))
             .expect_err("empty default name should fail");
 
         assert!(matches!(err, GitlaneError::InvalidProjectName));
@@ -341,12 +334,10 @@ mod tests {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_path = temp_dir.path().join("custom-project-data");
 
-        let initialized_path =
-            initialize(project_path.clone(), default_options("demo")).expect("init should succeed");
+        initialize(&project_path, default_options("demo")).expect("init should succeed");
 
-        assert_eq!(initialized_path, project_path);
-        assert!(initialized_path.join(PROJECT_CONFIG_FILE).is_file());
-        assert!(issues_file_path(&initialized_path, ISSUES_WORKFLOW_FILE).is_file());
+        assert!(project_path.join(PROJECT_CONFIG_FILE).is_file());
+        assert!(issues_file_path(&project_path, ISSUES_WORKFLOW_FILE).is_file());
     }
 
     #[test]
@@ -355,10 +346,9 @@ mod tests {
         let missing_parent = temp_dir.path().join("missing-parent");
         let project_path = missing_parent.join("project-data");
 
-        let initialized_path = initialize(project_path.clone(), default_options("demo"))
+        initialize(&project_path, default_options("demo"))
             .expect("init should create missing parent directories");
 
-        assert_eq!(initialized_path, project_path);
-        assert!(initialized_path.join(PROJECT_CONFIG_FILE).is_file());
+        assert!(project_path.join(PROJECT_CONFIG_FILE).is_file());
     }
 }

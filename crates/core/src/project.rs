@@ -16,8 +16,8 @@ pub struct ProjectConfig {
 }
 
 impl ProjectConfig {
-    pub fn load(project_dir: impl AsRef<Path>) -> Result<Self, GitlaneError> {
-        let config_path = project_dir.as_ref().join(PROJECT_CONFIG_FILE);
+    pub fn load(project_dir: &Path) -> Result<Self, GitlaneError> {
+        let config_path = project_dir.join(PROJECT_CONFIG_FILE);
         let content = read_text_file(&config_path)?;
 
         let raw: RawProjectConfig =

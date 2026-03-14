@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
             Ok(())
         }
         _ => {
-            let project_path = path::resolve_project(project_root)?;
+            let project_path = path::resolve_project(&project_root)?;
             let _service = Gitlane::load(project_path)?;
             bail!("command not implemented")
         }
