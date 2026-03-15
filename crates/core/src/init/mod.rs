@@ -33,20 +33,56 @@ pub struct InitOptions {
     ///
     /// When provided, this is used for new configs and updates existing
     /// configs.
-    pub name: Option<String>,
+    name: Option<String>,
     /// Fallback name used only when creating a new config and `name` is not
     /// provided.
-    pub default_name: String,
+    default_name: String,
     /// Optional project description to set on create or update.
-    pub description: Option<String>,
+    description: Option<String>,
     /// Optional homepage URL string to set on create or update.
-    pub homepage: Option<String>,
+    homepage: Option<String>,
 }
 
 impl InitOptions {
+    /// Build validated initialization options.
+    ///
+    /// Both `default_name` and `name` (when provided) must be non-empty and
+    /// not whitespace-only.
+    pub fn new(
+        name: Option<String>,
+        default_name: String,
+        description: Option<String>,
+        homepage: Option<String>,
+    ) -> Result<Self, GitlaneError> {
+        Self::validate_project_name(&default_name)?;
+        if let Some(name) = name.as_deref() {
+            Self::validate_project_name(name)?;
+        }
+
+        Ok(Self {
+            name,
+            default_name,
+            description,
+            homepage,
+        })
+    }
+
     /// Return whether these options request metadata updates.
-    fn updates_project_config(&self) -> bool {
+    fn has_project_metadata_updates(&self) -> bool {
         self.name.is_some() || self.description.is_some() || self.homepage.is_some()
+    }
+
+    /// Return the name to use when creating a new project config file.
+    fn project_name(&self) -> &str {
+        self.name.as_deref().unwrap_or(self.default_name.as_str())
+    }
+
+    fn validate_project_name(name: &str) -> Result<(), GitlaneError> {
+        if name.trim().is_empty() {
+            return Err(GitlaneError::InvalidProjectName);
+        }
+
+        Ok(())
     }
 }
 
@@ -55,22 +91,41 @@ impl InitOptions {
 /// This creates missing directories, scaffolds issue files, and ensures a
 /// valid `project.toml` exists.
 pub(crate) fn initialize(project_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
-    ensure_directory(project_path)?;
-    initialize_issues(project_path)?;
-    ensure_project_config(project_path, options)?;
+    ensure_project_root(project_path)?;
+    ensure_issues_layout(project_path)?;
+    sync_project_config(project_path, &options)?;
 
     Ok(())
 }
 
+/// Ensure the project root directory exists.
+fn ensure_project_root(project_path: &Path) -> Result<(), GitlaneError> {
+    ensure_directory(project_path)?;
+    Ok(())
+}
+
 /// Ensure issue directories and default scaffold files exist.
-fn initialize_issues(project_path: &Path) -> Result<(), GitlaneError> {
+fn ensure_issues_layout(project_path: &Path) -> Result<(), GitlaneError> {
     let issues_dir = project_path.join(ISSUES_DIR);
     ensure_directory(&issues_dir)?;
 
+    ensure_issue_state_dirs(&issues_dir)?;
+    ensure_issue_scaffold_files(&issues_dir)?;
+
+    Ok(())
+}
+
+/// Ensure all workflow state directories exist under `issues_dir`.
+fn ensure_issue_state_dirs(issues_dir: &Path) -> Result<(), GitlaneError> {
     for state in ISSUES_STATE_DIRS {
         ensure_directory(&issues_dir.join(state))?;
     }
 
+    Ok(())
+}
+
+/// Ensure default issue scaffold files exist under `issues_dir`.
+fn ensure_issue_scaffold_files(issues_dir: &Path) -> Result<(), GitlaneError> {
     for (file_name, content) in ISSUES_SCAFFOLD_FILES {
         write_file_if_missing(&issues_dir.join(file_name), content)?;
     }
@@ -79,42 +134,34 @@ fn initialize_issues(project_path: &Path) -> Result<(), GitlaneError> {
 }
 
 /// Ensure `project.toml` exists, creating or updating it as needed.
-fn ensure_project_config(project_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
+fn sync_project_config(project_path: &Path, options: &InitOptions) -> Result<(), GitlaneError> {
     let config_path = project_path.join(PROJECT_CONFIG_FILE);
     if config_path.exists() {
         ensure_file(&config_path)?;
 
-        if options.updates_project_config() {
+        if options.has_project_metadata_updates() {
             update_project_config(&config_path, options)?;
         }
 
         return Ok(());
     }
 
-    let InitOptions {
-        name,
-        default_name,
-        description,
-        homepage,
-    } = options;
+    create_project_config(&config_path, options)
+}
 
-    let name = name.unwrap_or(default_name);
-    validate_project_name(&name)?;
-
-    let content = render_project_toml(&name, description.as_deref(), homepage.as_deref());
-    write_text_file(&config_path, &content)?;
+/// Create `project.toml` from initialization options.
+fn create_project_config(config_path: &Path, options: &InitOptions) -> Result<(), GitlaneError> {
+    let content = render_project_toml(
+        options.project_name(),
+        options.description.as_deref(),
+        options.homepage.as_deref(),
+    );
+    write_text_file(config_path, &content)?;
     Ok(())
 }
 
 /// Apply metadata updates to an existing `project.toml`.
-fn update_project_config(config_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
-    let InitOptions {
-        name,
-        default_name: _,
-        description,
-        homepage,
-    } = options;
-
+fn update_project_config(config_path: &Path, options: &InitOptions) -> Result<(), GitlaneError> {
     let content = read_text_file(config_path)?;
 
     let mut table: Table = content.parse().map_err(|source| GitlaneError::ParseToml {
@@ -122,20 +169,30 @@ fn update_project_config(config_path: &Path, options: InitOptions) -> Result<(),
         source,
     })?;
 
-    if let Some(name) = name.as_deref() {
-        validate_project_name(name)?;
-    }
-
-    let mut changed = insert_optional_string_field(&mut table, "name", name);
-    changed |= insert_optional_string_field(&mut table, "description", description);
-    changed |= insert_optional_string_field(&mut table, "homepage", homepage);
+    let changed = apply_project_metadata_updates(&mut table, options);
 
     if !changed {
         return Ok(());
     }
 
+    write_project_config(config_path, &table)?;
+    Ok(())
+}
+
+/// Apply project metadata updates and return whether any field changed.
+fn apply_project_metadata_updates(table: &mut Table, options: &InitOptions) -> bool {
+    let mut changed = set_optional_string_field_if_changed(table, "name", options.name.as_deref());
+    changed |=
+        set_optional_string_field_if_changed(table, "description", options.description.as_deref());
+    changed |= set_optional_string_field_if_changed(table, "homepage", options.homepage.as_deref());
+
+    changed
+}
+
+/// Serialize and write `project.toml` with a trailing newline.
+fn write_project_config(config_path: &Path, table: &Table) -> Result<(), GitlaneError> {
     let mut serialized =
-        toml::to_string_pretty(&table).map_err(|source| GitlaneError::SerializeToml {
+        toml::to_string_pretty(table).map_err(|source| GitlaneError::SerializeToml {
             path: config_path.to_path_buf(),
             source,
         })?;
@@ -147,12 +204,20 @@ fn update_project_config(config_path: &Path, options: InitOptions) -> Result<(),
     Ok(())
 }
 
-/// Insert a string field only when `value` is present.
+/// Insert a string field only when `value` is present and different.
 ///
 /// Returns `true` when the table was modified.
-fn insert_optional_string_field(table: &mut Table, key: &str, value: Option<String>) -> bool {
+fn set_optional_string_field_if_changed(table: &mut Table, key: &str, value: Option<&str>) -> bool {
     if let Some(value) = value {
-        table.insert(key.to_owned(), Value::String(value));
+        if table
+            .get(key)
+            .and_then(Value::as_str)
+            .is_some_and(|current| current == value)
+        {
+            return false;
+        }
+
+        table.insert(key.to_owned(), Value::String(value.to_owned()));
         return true;
     }
 
@@ -177,15 +242,6 @@ fn render_project_toml(name: &str, description: Option<&str>, homepage: Option<&
     format!("{}\n", lines.join("\n"))
 }
 
-/// Validate that project names are not empty or whitespace-only.
-fn validate_project_name(name: &str) -> Result<(), GitlaneError> {
-    if name.trim().is_empty() {
-        return Err(GitlaneError::InvalidProjectName);
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,12 +258,8 @@ mod tests {
     use tempfile::TempDir;
 
     fn default_options(default_name: &str) -> InitOptions {
-        InitOptions {
-            name: None,
-            default_name: default_name.to_owned(),
-            description: None,
-            homepage: None,
-        }
+        InitOptions::new(None, default_name.to_owned(), None, None)
+            .expect("default test options should be valid")
     }
 
     fn issues_file_path(project_path: &Path, file_name: &str) -> PathBuf {
@@ -229,12 +281,13 @@ mod tests {
         let project_path = temp_dir.path();
         initialize(
             project_path,
-            InitOptions {
-                name: Some("My Project".to_owned()),
-                default_name: "Ignored".to_owned(),
-                description: Some("Git-native tracker".to_owned()),
-                homepage: Some("https://example.com".to_owned()),
-            },
+            InitOptions::new(
+                Some("My Project".to_owned()),
+                "Ignored".to_owned(),
+                Some("Git-native tracker".to_owned()),
+                Some("https://example.com".to_owned()),
+            )
+            .expect("init options should be valid"),
         )
         .expect("init should succeed");
 
@@ -311,12 +364,13 @@ mod tests {
 
         initialize(
             project_path,
-            InitOptions {
-                name: Some("Renamed".to_owned()),
-                default_name: "Ignored".to_owned(),
-                description: Some("Updated description".to_owned()),
-                homepage: Some("https://example.com/project".to_owned()),
-            },
+            InitOptions::new(
+                Some("Renamed".to_owned()),
+                "Ignored".to_owned(),
+                Some("Updated description".to_owned()),
+                Some("https://example.com/project".to_owned()),
+            )
+            .expect("init options should be valid"),
         )
         .expect("init should succeed");
 
@@ -331,27 +385,59 @@ mod tests {
     }
 
     #[test]
-    fn initialize_rejects_empty_name_argument() {
+    fn initialize_does_not_rewrite_project_config_when_updates_match_existing_values() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let err = initialize(
-            temp_dir.path(),
-            InitOptions {
-                name: Some("   ".to_owned()),
-                default_name: "fallback".to_owned(),
-                description: None,
-                homepage: None,
-            },
+        let project_path = temp_dir.path();
+        let project_toml_path = project_path.join(PROJECT_CONFIG_FILE);
+        let original_content = [
+            "# keep this comment",
+            "name = \"Existing\"",
+            "description = \"Same description\"",
+            "homepage = \"https://example.com/project\"",
+            "custom = \"keep\"",
+            "",
+        ]
+        .join("\n");
+
+        fs::write(&project_toml_path, &original_content).expect("project config should be written");
+
+        initialize(
+            project_path,
+            InitOptions::new(
+                Some("Existing".to_owned()),
+                "Ignored".to_owned(),
+                Some("Same description".to_owned()),
+                Some("https://example.com/project".to_owned()),
+            )
+            .expect("init options should be valid"),
         )
-        .expect_err("empty name should fail");
+        .expect("init should succeed");
+
+        let persisted_content =
+            fs::read_to_string(project_toml_path).expect("project config should be readable");
+        assert_eq!(persisted_content, original_content);
+    }
+
+    #[test]
+    fn init_options_rejects_empty_name_argument() {
+        let err = InitOptions::new(Some("   ".to_owned()), "fallback".to_owned(), None, None)
+            .expect_err("empty name should fail");
 
         assert!(matches!(err, GitlaneError::InvalidProjectName));
     }
 
     #[test]
-    fn initialize_rejects_empty_default_name_when_name_is_missing() {
-        let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let err = initialize(temp_dir.path(), default_options("   "))
+    fn init_options_rejects_empty_default_name() {
+        let err = InitOptions::new(None, "   ".to_owned(), None, None)
             .expect_err("empty default name should fail");
+
+        assert!(matches!(err, GitlaneError::InvalidProjectName));
+    }
+
+    #[test]
+    fn init_options_rejects_empty_default_name_even_when_name_is_set() {
+        let err = InitOptions::new(Some("Valid".to_owned()), "   ".to_owned(), None, None)
+            .expect_err("empty default name should fail even with explicit name");
 
         assert!(matches!(err, GitlaneError::InvalidProjectName));
     }

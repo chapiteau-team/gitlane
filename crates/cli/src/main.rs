@@ -20,12 +20,8 @@ fn main() -> anyhow::Result<()> {
                 Some(name) => name.clone(),
                 None => infer_project_name(&project_root)?,
             };
-            let options = InitOptions {
-                name: args.name,
-                default_name,
-                description: args.description,
-                homepage: args.homepage,
-            };
+            let options =
+                InitOptions::new(args.name, default_name, args.description, args.homepage)?;
             let project_path = project_root.join(GITLANE_DIR);
 
             let _service = Gitlane::init(project_path, options)?;

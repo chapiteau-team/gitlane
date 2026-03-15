@@ -112,12 +112,8 @@ name = ""
 
         let err = Gitlane::init(
             project_dir,
-            InitOptions {
-                name: None,
-                default_name: "ignored".to_owned(),
-                description: None,
-                homepage: None,
-            },
+            InitOptions::new(None, "ignored".to_owned(), None, None)
+                .expect("init options should be valid"),
         )
         .expect_err("invalid existing project config should fail");
 
