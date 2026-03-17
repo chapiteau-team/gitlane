@@ -3,6 +3,7 @@ mod fs;
 mod gitlane;
 mod init;
 mod project;
+mod workflow;
 
 pub mod paths;
 

@@ -18,6 +18,8 @@ Required top-level fields:
 - `states`: map of state id to state config.
 - `transitions`: map of source state id to transition map.
 
+Workflow ids must be non-empty and must not have leading or trailing whitespace.
+
 ### State schema
 
 Each state id is the key in `[states]`.

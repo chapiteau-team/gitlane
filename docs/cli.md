@@ -66,6 +66,7 @@ Commands other than `init` are currently scaffolded.
 - Existing files are not overwritten, except `.gitlane/project.toml` when one or more of `--name`, `--description`,
   or `--homepage` is provided.
 - When updating existing `project.toml`, only the provided fields are changed; all other keys are preserved.
+- Issue state directories are derived from `.gitlane/issues/workflow.toml`; `init` fails if the workflow config is invalid.
 
 ### Files and directories created when missing
 
@@ -76,11 +77,10 @@ Commands other than `init` are currently scaffolded.
     workflow.toml
     issues.toml
     labels.toml
-    todo/
-    in_progress/
-    review/
-    done/
+    <one directory per workflow state>
 ```
+
+For the default scaffolded workflow, `init` creates `todo/`, `in_progress/`, `review/`, and `done/`.
 
 ### Default bootstrap configs
 

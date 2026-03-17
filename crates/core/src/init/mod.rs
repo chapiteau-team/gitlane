@@ -4,7 +4,6 @@
 //! workflow/config/label files, and creates or updates `project.toml`.
 
 use std::path::Path;
-
 use toml::{Table, Value};
 
 use crate::{
@@ -14,9 +13,9 @@ use crate::{
         ISSUES_CONFIG_FILE, ISSUES_DIR, ISSUES_LABELS_FILE, ISSUES_WORKFLOW_FILE,
         PROJECT_CONFIG_FILE,
     },
+    workflow::WorkflowConfig,
 };
 
-const ISSUES_STATE_DIRS: [&str; 4] = ["todo", "in_progress", "review", "done"];
 const ISSUES_WORKFLOW_TOML: &str = include_str!("scaffold/issues/workflow.toml");
 const ISSUES_CONFIG_TOML: &str = include_str!("scaffold/issues/issues.toml");
 const ISSUES_LABELS_TOML: &str = include_str!("scaffold/issues/labels.toml");
@@ -109,15 +108,18 @@ fn ensure_issues_layout(project_path: &Path) -> Result<(), GitlaneError> {
     let issues_dir = project_path.join(ISSUES_DIR);
     ensure_directory(&issues_dir)?;
 
-    ensure_issue_state_dirs(&issues_dir)?;
     ensure_issue_scaffold_files(&issues_dir)?;
+    ensure_issue_state_dirs(&issues_dir)?;
 
     Ok(())
 }
 
 /// Ensure all workflow state directories exist under `issues_dir`.
 fn ensure_issue_state_dirs(issues_dir: &Path) -> Result<(), GitlaneError> {
-    for state in ISSUES_STATE_DIRS {
+    let workflow_path = issues_dir.join(ISSUES_WORKFLOW_FILE);
+    let workflow = WorkflowConfig::load_from_path(&workflow_path)?;
+
+    for state in workflow.state_ids() {
         ensure_directory(&issues_dir.join(state))?;
     }
 
@@ -266,8 +268,8 @@ mod tests {
         project_path.join(ISSUES_DIR).join(file_name)
     }
 
-    fn assert_issue_state_dirs_exist(project_path: &Path) {
-        for state in ISSUES_STATE_DIRS {
+    fn assert_issue_state_dirs_exist(project_path: &Path, expected_states: &[&str]) {
+        for state in expected_states {
             assert!(
                 project_path.join(ISSUES_DIR).join(state).is_dir(),
                 "state directory `{state}` should exist"
@@ -299,7 +301,7 @@ mod tests {
         assert!(issues_file_path(project_path, ISSUES_WORKFLOW_FILE).is_file());
         assert!(issues_file_path(project_path, ISSUES_CONFIG_FILE).is_file());
         assert!(issues_file_path(project_path, ISSUES_LABELS_FILE).is_file());
-        assert_issue_state_dirs_exist(project_path);
+        assert_issue_state_dirs_exist(project_path, &["todo", "in_progress", "review", "done"]);
 
         let labels_content = fs::read_to_string(issues_file_path(project_path, ISSUES_LABELS_FILE))
             .expect("labels config should be readable");
@@ -345,11 +347,45 @@ mod tests {
         );
         assert!(issues_file_path(existing_project_path, ISSUES_CONFIG_FILE).is_file());
         assert!(issues_file_path(existing_project_path, ISSUES_LABELS_FILE).is_file());
-        assert_issue_state_dirs_exist(existing_project_path);
+        assert_issue_state_dirs_exist(existing_project_path, &["custom"]);
+        assert!(!existing_project_path.join(ISSUES_DIR).join("todo").exists());
+        assert!(
+            !existing_project_path
+                .join(ISSUES_DIR)
+                .join("in_progress")
+                .exists()
+        );
+        assert!(
+            !existing_project_path
+                .join(ISSUES_DIR)
+                .join("review")
+                .exists()
+        );
+        assert!(!existing_project_path.join(ISSUES_DIR).join("done").exists());
 
         let project_content = fs::read_to_string(existing_project_path.join(PROJECT_CONFIG_FILE))
             .expect("project config should be readable");
         assert!(project_content.contains("custom = \"keep\""));
+    }
+
+    #[test]
+    fn initialize_fails_when_existing_workflow_is_invalid() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let project_path = temp_dir.path();
+        let issues_dir = project_path.join(ISSUES_DIR);
+        fs::create_dir_all(&issues_dir).expect("issues directory should be created");
+
+        fs::write(
+            issues_file_path(project_path, ISSUES_WORKFLOW_FILE),
+            "initial_state = \"todo\"\n[states]\nreview = { name = \"Review\" }\n",
+        )
+        .expect("workflow config should be written");
+
+        let err = initialize(project_path, default_options("demo"))
+            .expect_err("init should fail for invalid workflow config");
+
+        assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
+        assert!(!project_path.join(PROJECT_CONFIG_FILE).exists());
     }
 
     #[test]
