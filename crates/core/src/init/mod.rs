@@ -9,11 +9,11 @@ use toml::{Table, Value};
 use crate::{
     errors::GitlaneError,
     fs::{ensure_directory, ensure_file, read_text_file, write_file_if_missing, write_text_file},
+    issues::workflow::WorkflowConfig,
     paths::{
         ISSUES_CONFIG_FILE, ISSUES_DIR, ISSUES_LABELS_FILE, ISSUES_WORKFLOW_FILE,
         PROJECT_CONFIG_FILE,
     },
-    workflow::WorkflowConfig,
 };
 
 const ISSUES_WORKFLOW_TOML: &str = include_str!("scaffold/issues/workflow.toml");

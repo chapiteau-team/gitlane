@@ -2,8 +2,8 @@ mod errors;
 mod fs;
 mod gitlane;
 mod init;
+mod issues;
 mod project;
-mod workflow;
 
 pub mod paths;
 
