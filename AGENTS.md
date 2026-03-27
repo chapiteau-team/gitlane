@@ -129,6 +129,8 @@ If one cannot be run locally, explicitly note that in your handoff.
 
 ### Domain Docs (Read First)
 - Treat `docs/` as the canonical source for product behavior and data-model semantics.
+- Current `init` behavior is create-only: it may complete a partial `.gitlane/` scaffold when `.gitlane/project.toml`
+  is missing, but it must fail once `.gitlane/project.toml` already exists.
 - Before changing CLI behavior or config/data validation, read the relevant doc first:
   - `docs/cli.md` (command surface and expected behavior)
   - `docs/project.md` (`.gitlane/project.toml` schema)

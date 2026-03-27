@@ -8,6 +8,8 @@ use crate::fs::FsError;
 pub enum GitlaneError {
     #[error("project name must be a non-empty, non-whitespace string")]
     InvalidProjectName,
+    #[error("project already exists at `{path}`")]
+    ProjectAlreadyExists { path: PathBuf },
     #[error("invalid config in `{path}`: {message}")]
     InvalidConfig { path: PathBuf, message: String },
     #[error(transparent)]

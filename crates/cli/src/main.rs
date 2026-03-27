@@ -16,12 +16,10 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Command::Init(args) => {
-            let default_name = match args.name.as_ref() {
-                Some(name) => name.clone(),
-                None => infer_project_name(&project_root)?,
-            };
-            let options =
-                InitOptions::new(args.name, default_name, args.description, args.homepage)?;
+            let name = args
+                .name
+                .map_or_else(|| infer_project_name(&project_root), Ok)?;
+            let options = InitOptions::new(name, args.description, args.homepage)?;
             let project_path = project_root.join(GITLANE_DIR);
 
             let _service = Gitlane::init(project_path, options)?;
@@ -46,4 +44,30 @@ fn infer_project_name(project_root: &Path) -> anyhow::Result<String> {
                 project_root.display()
             )
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::path::PathBuf;
+
+    #[test]
+    fn infers_project_name_from_directory_name() {
+        let project_root = PathBuf::from("/tmp/example-project");
+
+        let name = infer_project_name(&project_root).expect("project name should be inferred");
+
+        assert_eq!(name, "example-project");
+    }
+
+    #[test]
+    fn errors_when_project_name_cannot_be_inferred() {
+        let err = infer_project_name(Path::new("/")).expect_err("root path should fail");
+
+        assert!(
+            err.to_string()
+                .contains("failed to infer project name from `/`; pass `--name`")
+        );
+    }
 }

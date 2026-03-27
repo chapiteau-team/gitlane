@@ -11,7 +11,8 @@ gitlane [OPTIONS] <COMMAND>
 Global options:
 
 - `--project <PATH>`:
-    - For `init`: target project root where `.gitlane` is created or updated. If omitted, uses current directory.
+    - For `init`: target project root where `.gitlane` is created. If `.gitlane/project.toml` already exists, `init`
+      returns an error. If omitted, uses current directory.
     - For other commands: path used as the starting point for `.gitlane` discovery. If omitted, starts from current
       directory. Discovery walks up parent directories (same style as `.git` discovery) and accepts either a
       `.gitlane` directory directly or a directory containing `.gitlane`. The resolved `.gitlane` directory must
@@ -21,7 +22,7 @@ Global options:
 ## Supported Commands
 
 - `init`
-    - Purpose: create or update `.gitlane` repository structure and baseline config files.
+    - Purpose: create `.gitlane` repository structure and baseline config files.
     - Status: implemented.
 - `validate`
     - Purpose: validate workflow, issue, and label configuration and data shape.
@@ -58,14 +59,13 @@ Commands other than `init` are currently scaffolded.
     - `--description <TEXT>`: set project description in `.gitlane/project.toml`.
     - `--homepage <URL>`: set project homepage in `.gitlane/project.toml`.
 
-### Safety and idempotency
+### Behavior
 
-- `init` is safe-idempotent.
 - Target project root is created when missing.
-- Missing files and directories are created.
-- Existing files are not overwritten, except `.gitlane/project.toml` when one or more of `--name`, `--description`,
-  or `--homepage` is provided.
-- When updating existing `project.toml`, only the provided fields are changed; all other keys are preserved.
+- If `.gitlane/project.toml` already exists, `init` fails and leaves the existing project unchanged.
+- If `.gitlane/` exists but `project.toml` is missing, `init` treats it as a partial scaffold and creates the missing
+  files and directories.
+- `--name`, `--description`, and `--homepage` are used only when creating `.gitlane/project.toml`.
 - Issue state directories are derived from `.gitlane/issues/workflow.toml`; `init` fails if the workflow config is invalid.
 
 ### Files and directories created when missing

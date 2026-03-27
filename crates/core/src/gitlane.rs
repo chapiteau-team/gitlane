@@ -31,8 +31,7 @@ impl Gitlane {
 
     /// Initialize a project at `project_path`, then load it.
     ///
-    /// See [`InitOptions`] for initialization behavior and metadata
-    /// updates.
+    /// See [`InitOptions`] for project creation behavior.
     pub fn init(project_path: PathBuf, options: InitOptions) -> Result<Self, GitlaneError> {
         init::initialize(&project_path, options)?;
         Self::load(project_path)
@@ -101,7 +100,7 @@ name = ""
     }
 
     #[test]
-    fn init_checks_initialized_project_can_be_loaded() {
+    fn init_fails_when_project_already_exists() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_dir = create_project_dir(
             temp_dir.path(),
@@ -111,12 +110,16 @@ name = ""
         );
 
         let err = Gitlane::init(
-            project_dir,
-            InitOptions::new(None, "ignored".to_owned(), None, None)
+            project_dir.clone(),
+            InitOptions::new("ignored".to_owned(), None, None)
                 .expect("init options should be valid"),
         )
         .expect_err("invalid existing project config should fail");
 
-        assert!(matches!(err, GitlaneError::InvalidProjectName));
+        assert!(matches!(
+            err,
+            GitlaneError::ProjectAlreadyExists { ref path }
+                if path == &project_dir.join(PROJECT_CONFIG_FILE)
+        ));
     }
 }

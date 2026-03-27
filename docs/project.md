@@ -50,4 +50,5 @@ people = ["@alice", "@bob", "@carol"]
 
 - `gitlane init` creates `.gitlane/project.toml` when missing.
 - Default `name` is the target directory name.
-- `--name`, `--description`, and `--homepage` can be used during `init` to set or update those fields.
+- `--name`, `--description`, and `--homepage` can be used during `init` to set those fields when the file is created.
+- If `.gitlane/project.toml` already exists, `gitlane init` returns an error and leaves the file unchanged.
