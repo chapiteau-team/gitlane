@@ -9,7 +9,7 @@ use crate::{
 /// Core service for interacting with project metadata and lifecycle.
 ///
 /// A `Gitlane` instance stores the project directory path and validated
-/// configuration loaded from `project.toml`.
+/// configuration loaded from the supported project config file.
 #[derive(Debug, Clone)]
 pub struct Gitlane {
     project_path: PathBuf,
@@ -19,7 +19,7 @@ pub struct Gitlane {
 impl Gitlane {
     /// Load an existing project from `project_path`.
     ///
-    /// This reads and validates `project.toml` in the provided directory.
+    /// This reads and validates the supported project config in the provided directory.
     pub fn load(project_path: PathBuf) -> Result<Self, GitlaneError> {
         let project_config = ProjectConfig::load(&project_path)?;
 
@@ -55,12 +55,15 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    use crate::paths::PROJECT_CONFIG_FILE;
+    use crate::config::{ConfigKind, default_config_path};
 
     fn create_project_dir(project_dir: &Path, config: &str) -> PathBuf {
         fs::create_dir_all(project_dir).expect("project directory should be created");
-        fs::write(project_dir.join(PROJECT_CONFIG_FILE), config)
-            .expect("project config should be created");
+        fs::write(
+            default_config_path(project_dir, ConfigKind::Project),
+            config,
+        )
+        .expect("project config should be created");
         project_dir.to_path_buf()
     }
 
@@ -119,7 +122,7 @@ name = ""
         assert!(matches!(
             err,
             GitlaneError::ProjectAlreadyExists { ref path }
-                if path == &project_dir.join(PROJECT_CONFIG_FILE)
+                if path == &default_config_path(&project_dir, ConfigKind::Project)
         ));
     }
 }

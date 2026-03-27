@@ -1,9 +1,14 @@
 use std::{collections::BTreeMap, path::Path};
 
-use crate::errors::{ConfigValidationError, GitlaneError};
+use crate::{
+    config::{impl_config, validate_id, validate_non_blank},
+    errors::{ConfigValidationError, GitlaneError},
+};
 
+mod codec;
 pub mod templates;
 pub mod toml;
+mod yaml;
 
 pub type StateId = String;
 pub type TransitionId = String;
@@ -43,10 +48,6 @@ impl WorkflowConfig {
         })
     }
 
-    pub fn load_from_path(workflow_path: &Path) -> Result<Self, GitlaneError> {
-        toml::load_from_path(workflow_path)
-    }
-
     pub fn save_to_path(&self, workflow_path: &Path) -> Result<(), GitlaneError> {
         toml::save_to_path(workflow_path, self)
     }
@@ -68,13 +69,11 @@ impl WorkflowConfig {
     }
 }
 
+impl_config!(WorkflowConfig);
+
 impl WorkflowState {
     pub fn new(name: String) -> Result<Self, ConfigValidationError> {
-        if name.trim().is_empty() {
-            return Err(ConfigValidationError::new(
-                "workflow states must have a non-empty `name`",
-            ));
-        }
+        validate_non_blank(&name, "workflow states must have a non-empty `name`")?;
 
         Ok(Self { name })
     }
@@ -86,11 +85,7 @@ impl WorkflowState {
 
 impl WorkflowTransition {
     pub fn new(name: String, to: StateId) -> Result<Self, ConfigValidationError> {
-        if name.trim().is_empty() {
-            return Err(ConfigValidationError::new(
-                "workflow transitions must have a non-empty `name`",
-            ));
-        }
+        validate_non_blank(&name, "workflow transitions must have a non-empty `name`")?;
 
         validate_id(
             &to,
@@ -143,11 +138,10 @@ fn validate_states(states: &BTreeMap<StateId, WorkflowState>) -> Result<(), Conf
             "workflow state ids must not have leading or trailing whitespace",
         )?;
 
-        if state.name().trim().is_empty() {
-            return Err(ConfigValidationError::new(format!(
-                "workflow state `{state_id}` must have a non-empty `name`"
-            )));
-        }
+        validate_non_blank(
+            state.name(),
+            format!("workflow state `{state_id}` must have a non-empty `name`"),
+        )?;
     }
 
     Ok(())
@@ -179,11 +173,12 @@ fn validate_transitions(
                 ),
             )?;
 
-            if transition.name().trim().is_empty() {
-                return Err(ConfigValidationError::new(format!(
+            validate_non_blank(
+                transition.name(),
+                format!(
                     "workflow transition `{transition_id}` from `{from_state}` must have a non-empty `name`"
-                )));
-            }
+                ),
+            )?;
 
             if !states.contains_key(transition.to()) {
                 return Err(ConfigValidationError::new(format!(
@@ -192,22 +187,6 @@ fn validate_transitions(
                 )));
             }
         }
-    }
-
-    Ok(())
-}
-
-fn validate_id(
-    id: &str,
-    empty_message: impl Into<String>,
-    whitespace_message: impl Into<String>,
-) -> Result<(), ConfigValidationError> {
-    if id.is_empty() {
-        return Err(ConfigValidationError::new(empty_message));
-    }
-
-    if id.trim() != id {
-        return Err(ConfigValidationError::new(whitespace_message));
     }
 
     Ok(())
@@ -572,5 +551,54 @@ finish = { name = "Finish", to = "review" }
             .expect("workflow should load after saving");
 
         assert_eq!(loaded, workflow);
+    }
+
+    #[test]
+    fn loads_yaml_workflow() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let workflow_path = temp_dir.path().join("workflow.yaml");
+        fs::write(
+            &workflow_path,
+            concat!(
+                "initial_state: todo\n",
+                "states:\n",
+                "  todo:\n",
+                "    name: To Do\n",
+                "  done:\n",
+                "    name: Done\n",
+                "transitions:\n",
+                "  todo:\n",
+                "    finish:\n",
+                "      name: Finish\n",
+                "      to: done\n"
+            ),
+        )
+        .expect("yaml workflow should be written");
+
+        let workflow =
+            WorkflowConfig::load_from_path(&workflow_path).expect("yaml workflow should load");
+
+        assert_eq!(workflow.state_ids().collect::<Vec<_>>(), ["done", "todo"]);
+    }
+
+    #[test]
+    fn loads_yml_workflow() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let workflow_path = temp_dir.path().join("workflow.yml");
+        fs::write(
+            &workflow_path,
+            concat!(
+                "initial_state: todo\n",
+                "states:\n",
+                "  todo:\n",
+                "    name: To Do\n"
+            ),
+        )
+        .expect("yml workflow should be written");
+
+        let workflow =
+            WorkflowConfig::load_from_path(&workflow_path).expect("yml workflow should load");
+
+        assert_eq!(workflow.state_ids().collect::<Vec<_>>(), ["todo"]);
     }
 }

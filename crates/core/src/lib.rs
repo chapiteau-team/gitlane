@@ -1,3 +1,4 @@
+pub mod config;
 pub mod errors;
 mod fs;
 mod gitlane;

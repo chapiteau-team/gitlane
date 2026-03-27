@@ -3,10 +3,15 @@ use std::{
     path::Path,
 };
 
-use crate::errors::{ConfigValidationError, GitlaneError};
+use crate::{
+    config::{impl_config, validate_id, validate_non_blank},
+    errors::{ConfigValidationError, GitlaneError},
+};
 
+mod codec;
 pub mod templates;
 pub mod toml;
+mod yaml;
 
 pub type PriorityId = String;
 
@@ -40,10 +45,6 @@ impl IssuesConfig {
         })
     }
 
-    pub fn load_from_path(config_path: &Path) -> Result<Self, GitlaneError> {
-        toml::load_from_path(config_path)
-    }
-
     pub fn save_to_path(&self, config_path: &Path) -> Result<(), GitlaneError> {
         toml::save_to_path(config_path, self)
     }
@@ -61,13 +62,11 @@ impl IssuesConfig {
     }
 }
 
+impl_config!(IssuesConfig);
+
 impl IssuePriority {
     pub fn new(name: String, description: Option<String>) -> Result<Self, ConfigValidationError> {
-        if name.trim().is_empty() {
-            return Err(ConfigValidationError::new(
-                "issue priorities must have a non-empty `name`",
-            ));
-        }
+        validate_non_blank(&name, "issue priorities must have a non-empty `name`")?;
 
         Ok(Self { name, description })
     }
@@ -82,19 +81,11 @@ impl IssuePriority {
 }
 
 fn validate_issue_prefix(issue_prefix: &str) -> Result<(), ConfigValidationError> {
-    if issue_prefix.is_empty() {
-        return Err(ConfigValidationError::new(
-            "`issue_prefix` must be a non-empty string",
-        ));
-    }
-
-    if issue_prefix.trim() != issue_prefix {
-        return Err(ConfigValidationError::new(
-            "`issue_prefix` must not have leading or trailing whitespace",
-        ));
-    }
-
-    Ok(())
+    validate_id(
+        issue_prefix,
+        "`issue_prefix` must be a non-empty string",
+        "`issue_prefix` must not have leading or trailing whitespace",
+    )
 }
 
 fn validate_priorities(
@@ -113,11 +104,10 @@ fn validate_priorities(
             "priority ids must not have leading or trailing whitespace",
         )?;
 
-        if priority.name().trim().is_empty() {
-            return Err(ConfigValidationError::new(format!(
-                "priority `{priority_id}` must have a non-empty `name`"
-            )));
-        }
+        validate_non_blank(
+            priority.name(),
+            format!("priority `{priority_id}` must have a non-empty `name`"),
+        )?;
     }
 
     Ok(())
@@ -169,25 +159,11 @@ fn validate_priority_order(
     Ok(())
 }
 
-fn validate_id(
-    id: &str,
-    empty_message: impl Into<String>,
-    whitespace_message: impl Into<String>,
-) -> Result<(), ConfigValidationError> {
-    if id.is_empty() {
-        return Err(ConfigValidationError::new(empty_message));
-    }
-
-    if id.trim() != id {
-        return Err(ConfigValidationError::new(whitespace_message));
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::fs;
 
     use tempfile::TempDir;
 
@@ -349,5 +325,59 @@ p1 = { name = "Urgent" }
             .expect("issues config should load after saving");
 
         assert_eq!(loaded, config);
+    }
+
+    #[test]
+    fn loads_yaml_issues_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("issues.yaml");
+        fs::write(
+            &config_path,
+            concat!(
+                "issue_prefix: ISS\n",
+                "priority_order:\n",
+                "  - p1\n",
+                "  - p0\n",
+                "priorities:\n",
+                "  p0:\n",
+                "    name: No Priority\n",
+                "  p1:\n",
+                "    name: Urgent\n",
+                "    description: Needs immediate attention\n"
+            ),
+        )
+        .expect("yaml issues config should be written");
+
+        let config =
+            IssuesConfig::load_from_path(&config_path).expect("yaml issues config should load");
+
+        assert_eq!(config.issue_prefix(), "ISS");
+        assert_eq!(
+            config.priority_order(),
+            &["p1".to_string(), "p0".to_string()]
+        );
+    }
+
+    #[test]
+    fn loads_yml_issues_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("issues.yml");
+        fs::write(
+            &config_path,
+            concat!(
+                "issue_prefix: ISS\n",
+                "priority_order:\n",
+                "  - p1\n",
+                "priorities:\n",
+                "  p1:\n",
+                "    name: Urgent\n"
+            ),
+        )
+        .expect("yml issues config should be written");
+
+        let config =
+            IssuesConfig::load_from_path(&config_path).expect("yml issues config should load");
+
+        assert_eq!(config.issue_prefix(), "ISS");
     }
 }

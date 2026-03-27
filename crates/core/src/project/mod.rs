@@ -1,8 +1,17 @@
-use std::{collections::HashSet, path::Path};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
-use crate::errors::{ConfigValidationError, GitlaneError};
+use crate::{
+    config::{ConfigKind, config_candidate_paths, impl_config, validate_non_blank},
+    errors::{ConfigValidationError, GitlaneError},
+    fs::ensure_file,
+};
 
+mod codec;
 pub mod toml;
+mod yaml;
 
 /// Validated project metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,19 +30,17 @@ impl ProjectConfig {
         homepage: Option<String>,
         people: Vec<String>,
     ) -> Result<Self, ConfigValidationError> {
-        if name.trim().is_empty() {
-            return Err(ConfigValidationError::new(
-                "project name must be a non-empty, non-whitespace string",
-            ));
-        }
+        validate_non_blank(
+            &name,
+            "project name must be a non-empty, non-whitespace string",
+        )?;
 
         let mut seen = HashSet::with_capacity(people.len());
         for (index, handle) in people.iter().enumerate() {
-            if handle.trim().is_empty() {
-                return Err(ConfigValidationError::new(format!(
-                    "`people[{index}]` must be a non-empty handle"
-                )));
-            }
+            validate_non_blank(
+                handle,
+                format!("`people[{index}]` must be a non-empty handle"),
+            )?;
 
             if !seen.insert(handle) {
                 return Err(ConfigValidationError::new(format!(
@@ -50,9 +57,12 @@ impl ProjectConfig {
         })
     }
 
-    /// Load and validate project configuration from the default TOML file.
+    /// Load and validate project configuration from the supported config file.
     pub fn load(project_dir: &Path) -> Result<Self, GitlaneError> {
-        toml::load(project_dir)
+        match discover_config_path(project_dir)? {
+            Some(config_path) => Self::load_from_path(&config_path),
+            None => toml::load(project_dir),
+        }
     }
 
     /// Return the project display name.
@@ -76,13 +86,38 @@ impl ProjectConfig {
     }
 }
 
+impl_config!(ProjectConfig);
+
+fn discover_config_path(project_dir: &Path) -> Result<Option<PathBuf>, GitlaneError> {
+    let mut matches = Vec::new();
+
+    for candidate in config_candidate_paths(project_dir, ConfigKind::Project) {
+        if candidate.exists() {
+            ensure_file(&candidate)?;
+            matches.push(candidate);
+        }
+    }
+
+    match matches.len() {
+        0 => Ok(None),
+        1 => Ok(matches.pop()),
+        _ => Err(GitlaneError::AmbiguousConfigFiles {
+            config_name: "project",
+            paths: matches,
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use std::{fs, path::Path};
 
-    use crate::paths::PROJECT_CONFIG_FILE;
+    use crate::{
+        config::{ConfigFileExtension, ConfigKind, config_path},
+        errors::ConfigParseError,
+    };
     use tempfile::TempDir;
 
     fn parse_project_config(content: &str) -> Result<ProjectConfig, GitlaneError> {
@@ -188,7 +223,11 @@ people = ["@alice", "@bob", "@carol"]
     #[test]
     fn saves_and_loads_toml_config() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let config_path = temp_dir.path().join(PROJECT_CONFIG_FILE);
+        let config_path = config_path(
+            temp_dir.path(),
+            ConfigKind::Project,
+            ConfigFileExtension::Toml,
+        );
         let config = ProjectConfig::new(
             "Gitlane".to_owned(),
             Some("Git-native task tracker".to_owned()),
@@ -210,5 +249,106 @@ people = ["@alice", "@bob", "@carol"]
                 "people = [\"@alice\"]\n"
             )
         );
+    }
+
+    #[test]
+    fn loads_yaml_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        fs::write(
+            config_path(
+                temp_dir.path(),
+                ConfigKind::Project,
+                ConfigFileExtension::Yaml,
+            ),
+            concat!(
+                "name: Gitlane\n",
+                "description: Git-native task tracker\n",
+                "homepage: https://github.com/example/gitlane\n",
+                "people:\n",
+                "  - '@alice'\n",
+                "  - '@bob'\n"
+            ),
+        )
+        .expect("yaml project config should be written");
+
+        let config = ProjectConfig::load(temp_dir.path()).expect("yaml project config should load");
+
+        assert_eq!(config.name(), "Gitlane");
+        assert_eq!(config.description(), Some("Git-native task tracker"));
+        assert_eq!(
+            config.homepage(),
+            Some("https://github.com/example/gitlane")
+        );
+        assert_eq!(
+            config.people(),
+            &["@alice".to_string(), "@bob".to_string(),]
+        );
+    }
+
+    #[test]
+    fn loads_yml_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        fs::write(
+            config_path(
+                temp_dir.path(),
+                ConfigKind::Project,
+                ConfigFileExtension::Yml,
+            ),
+            "name: Gitlane\n",
+        )
+        .expect("yml project config should be written");
+
+        let config = ProjectConfig::load(temp_dir.path()).expect("yml project config should load");
+
+        assert_eq!(config.name(), "Gitlane");
+    }
+
+    #[test]
+    fn errors_when_multiple_project_config_formats_exist() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let project_dir = temp_dir.path();
+        fs::write(
+            config_path(project_dir, ConfigKind::Project, ConfigFileExtension::Toml),
+            "name = \"Gitlane\"\n",
+        )
+        .expect("toml project config should be written");
+        fs::write(
+            config_path(project_dir, ConfigKind::Project, ConfigFileExtension::Yaml),
+            "name: Gitlane\n",
+        )
+        .expect("yaml project config should be written");
+
+        let err = ProjectConfig::load(project_dir)
+            .expect_err("multiple project config files should fail");
+
+        assert!(matches!(err, GitlaneError::AmbiguousConfigFiles { .. }));
+    }
+
+    #[test]
+    fn reports_toml_parse_errors_with_unified_variant() {
+        let err = toml::parse_str("name = [", Path::new("project.toml"))
+            .expect_err("invalid TOML should fail");
+
+        assert!(matches!(
+            err,
+            GitlaneError::ParseConfig {
+                source: ConfigParseError::Toml(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn reports_yaml_parse_errors_with_unified_variant() {
+        let err = yaml::parse_str("name: [", Path::new("project.yaml"))
+            .expect_err("invalid YAML should fail");
+
+        assert!(matches!(
+            err,
+            GitlaneError::ParseConfig {
+                source: ConfigParseError::Yaml(_),
+                ..
+            }
+        ));
     }
 }

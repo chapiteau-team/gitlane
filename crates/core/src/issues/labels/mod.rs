@@ -1,9 +1,14 @@
 use std::{collections::BTreeMap, path::Path};
 
-use crate::errors::{ConfigValidationError, GitlaneError};
+use crate::{
+    config::{impl_config, validate_id, validate_non_blank},
+    errors::{ConfigValidationError, GitlaneError},
+};
 
+mod codec;
 pub mod templates;
 pub mod toml;
+mod yaml;
 
 pub type LabelId = String;
 pub type LabelGroupId = String;
@@ -13,6 +18,8 @@ pub struct LabelsConfig {
     label_groups: BTreeMap<LabelGroupId, LabelGroup>,
     labels: BTreeMap<LabelId, Label>,
 }
+
+impl_config!(LabelsConfig);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LabelGroup {
@@ -41,10 +48,6 @@ impl LabelsConfig {
             label_groups,
             labels,
         })
-    }
-
-    pub fn load_from_path(config_path: &Path) -> Result<Self, GitlaneError> {
-        toml::load_from_path(config_path)
     }
 
     pub fn save_to_path(&self, config_path: &Path) -> Result<(), GitlaneError> {
@@ -76,11 +79,7 @@ impl LabelGroup {
         description: Option<String>,
         color: Option<String>,
     ) -> Result<Self, ConfigValidationError> {
-        if name.trim().is_empty() {
-            return Err(ConfigValidationError::new(
-                "label groups must have a non-empty `name`",
-            ));
-        }
+        validate_non_blank(&name, "label groups must have a non-empty `name`")?;
 
         Ok(Self {
             name,
@@ -109,11 +108,7 @@ impl Label {
         color: Option<String>,
         group: Option<LabelGroupId>,
     ) -> Result<Self, ConfigValidationError> {
-        if name.trim().is_empty() {
-            return Err(ConfigValidationError::new(
-                "labels must have a non-empty `name`",
-            ));
-        }
+        validate_non_blank(&name, "labels must have a non-empty `name`")?;
 
         Ok(Self {
             name,
@@ -150,11 +145,10 @@ fn validate_label_groups(
             "label group ids must not have leading or trailing whitespace",
         )?;
 
-        if group.name().trim().is_empty() {
-            return Err(ConfigValidationError::new(format!(
-                "label group `{group_id}` must have a non-empty `name`"
-            )));
-        }
+        validate_non_blank(
+            group.name(),
+            format!("label group `{group_id}` must have a non-empty `name`"),
+        )?;
     }
 
     Ok(())
@@ -171,11 +165,10 @@ fn validate_labels(
             "label ids must not have leading or trailing whitespace",
         )?;
 
-        if label.name().trim().is_empty() {
-            return Err(ConfigValidationError::new(format!(
-                "label `{label_id}` must have a non-empty `name`"
-            )));
-        }
+        validate_non_blank(
+            label.name(),
+            format!("label `{label_id}` must have a non-empty `name`"),
+        )?;
 
         if let Some(group_id) = label.group() {
             validate_id(
@@ -197,25 +190,11 @@ fn validate_labels(
     Ok(())
 }
 
-fn validate_id(
-    id: &str,
-    empty_message: impl Into<String>,
-    whitespace_message: impl Into<String>,
-) -> Result<(), ConfigValidationError> {
-    if id.is_empty() {
-        return Err(ConfigValidationError::new(empty_message));
-    }
-
-    if id.trim() != id {
-        return Err(ConfigValidationError::new(whitespace_message));
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::fs;
 
     use tempfile::TempDir;
 
@@ -335,5 +314,55 @@ type_bug = { name = "   " }
             .expect("labels config should load after saving");
 
         assert_eq!(loaded, config);
+    }
+
+    #[test]
+    fn loads_yaml_labels_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("labels.yaml");
+        fs::write(
+            &config_path,
+            concat!(
+                "label_groups:\n",
+                "  type:\n",
+                "    name: Type\n",
+                "    color: '#334155'\n",
+                "labels:\n",
+                "  type_bug:\n",
+                "    name: Bug\n",
+                "    group: type\n",
+                "  blocked:\n",
+                "    name: Blocked\n",
+                "    color: '#b91c1c'\n"
+            ),
+        )
+        .expect("yaml labels config should be written");
+
+        let config =
+            LabelsConfig::load_from_path(&config_path).expect("yaml labels config should load");
+
+        assert_eq!(config.resolved_color("type_bug"), Some("#334155"));
+        assert_eq!(config.resolved_color("blocked"), Some("#b91c1c"));
+    }
+
+    #[test]
+    fn loads_yml_labels_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("labels.yml");
+        fs::write(
+            &config_path,
+            concat!(
+                "labels:\n",
+                "  blocked:\n",
+                "    name: Blocked\n",
+                "    color: '#b91c1c'\n"
+            ),
+        )
+        .expect("yml labels config should be written");
+
+        let config =
+            LabelsConfig::load_from_path(&config_path).expect("yml labels config should load");
+
+        assert_eq!(config.resolved_color("blocked"), Some("#b91c1c"));
     }
 }

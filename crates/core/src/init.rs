@@ -6,13 +6,11 @@
 use std::path::Path;
 
 use crate::{
+    config::{ConfigKind, default_config_path},
     errors::GitlaneError,
     fs::{ensure_directory, ensure_file},
     issues::{config, labels, workflow},
-    paths::{
-        ISSUES_CONFIG_FILE, ISSUES_DIR, ISSUES_LABELS_FILE, ISSUES_WORKFLOW_FILE,
-        PROJECT_CONFIG_FILE,
-    },
+    paths::ISSUES_DIR,
     project::{self, ProjectConfig},
 };
 
@@ -65,7 +63,10 @@ pub fn initialize(project_path: &Path, options: InitOptions) -> Result<(), Gitla
     ensure_project_root(project_path)?;
     ensure_project_config_missing(project_path)?;
     ensure_issues_layout(project_path)?;
-    create_project_config(&project_path.join(PROJECT_CONFIG_FILE), &options)?;
+    create_project_config(
+        &default_config_path(project_path, ConfigKind::Project),
+        &options,
+    )?;
 
     Ok(())
 }
@@ -78,7 +79,7 @@ fn ensure_project_root(project_path: &Path) -> Result<(), GitlaneError> {
 
 /// Ensure `project.toml` is not already present for this project.
 fn ensure_project_config_missing(project_path: &Path) -> Result<(), GitlaneError> {
-    let config_path = project_path.join(PROJECT_CONFIG_FILE);
+    let config_path = default_config_path(project_path, ConfigKind::Project);
     if config_path.exists() {
         ensure_file(&config_path)?;
         return Err(GitlaneError::ProjectAlreadyExists { path: config_path });
@@ -92,15 +93,16 @@ fn ensure_issues_layout(project_path: &Path) -> Result<(), GitlaneError> {
     let issues_dir = project_path.join(ISSUES_DIR);
     ensure_directory(&issues_dir)?;
 
-    ensure_issue_scaffold_files(&issues_dir)?;
-    ensure_issue_state_dirs(&issues_dir)?;
+    ensure_issue_scaffold_files(project_path)?;
+    ensure_issue_state_dirs(project_path)?;
 
     Ok(())
 }
 
 /// Ensure all workflow state directories exist under `issues_dir`.
-fn ensure_issue_state_dirs(issues_dir: &Path) -> Result<(), GitlaneError> {
-    let workflow_path = issues_dir.join(ISSUES_WORKFLOW_FILE);
+fn ensure_issue_state_dirs(project_path: &Path) -> Result<(), GitlaneError> {
+    let issues_dir = project_path.join(ISSUES_DIR);
+    let workflow_path = default_config_path(project_path, ConfigKind::Workflow);
     let workflow = workflow::WorkflowConfig::load_from_path(&workflow_path)?;
 
     for state in workflow.state_ids() {
@@ -111,10 +113,10 @@ fn ensure_issue_state_dirs(issues_dir: &Path) -> Result<(), GitlaneError> {
 }
 
 /// Ensure default issue scaffold files exist under `issues_dir`.
-fn ensure_issue_scaffold_files(issues_dir: &Path) -> Result<(), GitlaneError> {
-    write_default_workflow_config_if_missing(issues_dir)?;
-    write_default_issues_config_if_missing(issues_dir)?;
-    write_default_labels_config_if_missing(issues_dir)?;
+fn ensure_issue_scaffold_files(project_path: &Path) -> Result<(), GitlaneError> {
+    write_default_workflow_config_if_missing(project_path)?;
+    write_default_issues_config_if_missing(project_path)?;
+    write_default_labels_config_if_missing(project_path)?;
 
     Ok(())
 }
@@ -131,8 +133,8 @@ fn create_project_config(config_path: &Path, options: &InitOptions) -> Result<()
     project::toml::save_to_path(config_path, &config)
 }
 
-fn write_default_workflow_config_if_missing(issues_dir: &Path) -> Result<(), GitlaneError> {
-    let workflow_path = issues_dir.join(ISSUES_WORKFLOW_FILE);
+fn write_default_workflow_config_if_missing(project_path: &Path) -> Result<(), GitlaneError> {
+    let workflow_path = default_config_path(project_path, ConfigKind::Workflow);
     if workflow_path.exists() {
         ensure_file(&workflow_path)?;
         return Ok(());
@@ -144,8 +146,8 @@ fn write_default_workflow_config_if_missing(issues_dir: &Path) -> Result<(), Git
     Ok(())
 }
 
-fn write_default_issues_config_if_missing(issues_dir: &Path) -> Result<(), GitlaneError> {
-    let config_path = issues_dir.join(ISSUES_CONFIG_FILE);
+fn write_default_issues_config_if_missing(project_path: &Path) -> Result<(), GitlaneError> {
+    let config_path = default_config_path(project_path, ConfigKind::Issues);
     if config_path.exists() {
         ensure_file(&config_path)?;
         return Ok(());
@@ -157,8 +159,8 @@ fn write_default_issues_config_if_missing(issues_dir: &Path) -> Result<(), Gitla
     Ok(())
 }
 
-fn write_default_labels_config_if_missing(issues_dir: &Path) -> Result<(), GitlaneError> {
-    let config_path = issues_dir.join(ISSUES_LABELS_FILE);
+fn write_default_labels_config_if_missing(project_path: &Path) -> Result<(), GitlaneError> {
+    let config_path = default_config_path(project_path, ConfigKind::Labels);
     if config_path.exists() {
         ensure_file(&config_path)?;
         return Ok(());
@@ -177,10 +179,8 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use crate::{
-        paths::{
-            ISSUES_CONFIG_FILE, ISSUES_DIR, ISSUES_LABELS_FILE, ISSUES_WORKFLOW_FILE,
-            PROJECT_CONFIG_FILE,
-        },
+        config::{ConfigKind, default_config_path},
+        paths::ISSUES_DIR,
         project::ProjectConfig,
     };
     use tempfile::TempDir;
@@ -189,8 +189,8 @@ mod tests {
         InitOptions::new(name.to_owned(), None, None).expect("test init options should be valid")
     }
 
-    fn issues_file_path(project_path: &Path, file_name: &str) -> PathBuf {
-        project_path.join(ISSUES_DIR).join(file_name)
+    fn issues_file_path(project_path: &Path, kind: ConfigKind) -> PathBuf {
+        default_config_path(project_path, kind)
     }
 
     fn assert_issue_state_dirs_exist(project_path: &Path, expected_states: &[&str]) {
@@ -222,12 +222,12 @@ mod tests {
         assert_eq!(config.description(), Some("Git-native tracker"));
         assert_eq!(config.homepage(), Some("https://example.com"));
 
-        assert!(issues_file_path(project_path, ISSUES_WORKFLOW_FILE).is_file());
-        assert!(issues_file_path(project_path, ISSUES_CONFIG_FILE).is_file());
-        assert!(issues_file_path(project_path, ISSUES_LABELS_FILE).is_file());
+        assert!(issues_file_path(project_path, ConfigKind::Workflow).is_file());
+        assert!(issues_file_path(project_path, ConfigKind::Issues).is_file());
+        assert!(issues_file_path(project_path, ConfigKind::Labels).is_file());
         assert_issue_state_dirs_exist(project_path, &["todo", "in_progress", "review", "done"]);
 
-        let labels_content = fs::read_to_string(issues_file_path(project_path, ISSUES_LABELS_FILE))
+        let labels_content = fs::read_to_string(issues_file_path(project_path, ConfigKind::Labels))
             .expect("labels config should be readable");
         assert!(labels_content.contains("type_docs"));
     }
@@ -249,12 +249,12 @@ mod tests {
         let issues_dir = existing_project_path.join(ISSUES_DIR);
         fs::create_dir_all(&issues_dir).expect("issues directory should be created");
 
-        let workflow_path = issues_file_path(existing_project_path, ISSUES_WORKFLOW_FILE);
+        let workflow_path = issues_file_path(existing_project_path, ConfigKind::Workflow);
         let custom_workflow =
             "initial_state = \"custom\"\n[states]\ncustom = { name = \"Custom\" }\n";
         fs::write(&workflow_path, custom_workflow).expect("workflow config should be written");
 
-        let labels_path = issues_file_path(existing_project_path, ISSUES_LABELS_FILE);
+        let labels_path = issues_file_path(existing_project_path, ConfigKind::Labels);
         let custom_labels = "[labels]\ncustom = { name = \"Custom\" }\n";
         fs::write(&labels_path, custom_labels).expect("labels config should be written");
 
@@ -271,7 +271,7 @@ mod tests {
             fs::read_to_string(&labels_path).expect("labels config should be readable"),
             custom_labels
         );
-        assert!(issues_file_path(existing_project_path, ISSUES_CONFIG_FILE).is_file());
+        assert!(issues_file_path(existing_project_path, ConfigKind::Issues).is_file());
         assert_issue_state_dirs_exist(existing_project_path, &["custom"]);
         assert!(!existing_project_path.join(ISSUES_DIR).join("todo").exists());
         assert!(
@@ -297,7 +297,7 @@ mod tests {
         fs::create_dir_all(&issues_dir).expect("issues directory should be created");
 
         fs::write(
-            issues_file_path(project_path, ISSUES_WORKFLOW_FILE),
+            issues_file_path(project_path, ConfigKind::Workflow),
             "initial_state = \"todo\"\n[states]\nreview = { name = \"Review\" }\n",
         )
         .expect("workflow config should be written");
@@ -306,14 +306,14 @@ mod tests {
             .expect_err("init should fail for invalid workflow config");
 
         assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
-        assert!(!project_path.join(PROJECT_CONFIG_FILE).exists());
+        assert!(!default_config_path(project_path, ConfigKind::Project).exists());
     }
 
     #[test]
     fn initialize_fails_when_project_config_already_exists() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_path = temp_dir.path();
-        let project_toml_path = project_path.join(PROJECT_CONFIG_FILE);
+        let project_toml_path = default_config_path(project_path, ConfigKind::Project);
         fs::write(&project_toml_path, "name = \"Existing\"\n")
             .expect("project config should be written");
 
@@ -331,7 +331,7 @@ mod tests {
     fn initialize_does_not_update_existing_project_config() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_path = temp_dir.path();
-        let project_toml_path = project_path.join(PROJECT_CONFIG_FILE);
+        let project_toml_path = default_config_path(project_path, ConfigKind::Project);
         let original_content = [
             "# keep this comment",
             "name = \"Existing\"",
@@ -375,8 +375,8 @@ mod tests {
 
         initialize(&project_path, options("demo")).expect("init should succeed");
 
-        assert!(project_path.join(PROJECT_CONFIG_FILE).is_file());
-        assert!(issues_file_path(&project_path, ISSUES_WORKFLOW_FILE).is_file());
+        assert!(default_config_path(&project_path, ConfigKind::Project).is_file());
+        assert!(issues_file_path(&project_path, ConfigKind::Workflow).is_file());
     }
 
     #[test]
@@ -388,6 +388,6 @@ mod tests {
         initialize(&project_path, options("demo"))
             .expect("init should create missing parent directories");
 
-        assert!(project_path.join(PROJECT_CONFIG_FILE).is_file());
+        assert!(default_config_path(&project_path, ConfigKind::Project).is_file());
     }
 }

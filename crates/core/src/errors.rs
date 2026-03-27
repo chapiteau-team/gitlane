@@ -12,17 +12,24 @@ pub enum GitlaneError {
     ProjectAlreadyExists { path: PathBuf },
     #[error("invalid config in `{path}`: {message}")]
     InvalidConfig { path: PathBuf, message: String },
-    #[error("failed to parse `{path}` as TOML")]
-    ParseToml {
+    #[error("failed to parse `{path}` as {format}", format = .source.format_name())]
+    ParseConfig {
         path: PathBuf,
         #[source]
-        source: toml::de::Error,
+        source: ConfigParseError,
     },
     #[error("failed to serialize TOML for `{path}`")]
     SerializeToml {
         path: PathBuf,
         #[source]
         source: toml::ser::Error,
+    },
+    #[error("unsupported config format for `{path}`; expected .toml, .yaml, or .yml")]
+    UnsupportedConfigFormat { path: PathBuf },
+    #[error("found multiple supported {config_name} config files: {paths:?}")]
+    AmbiguousConfigFiles {
+        config_name: &'static str,
+        paths: Vec<PathBuf>,
     },
     #[error(transparent)]
     Filesystem(#[from] FsError),
@@ -33,6 +40,30 @@ impl GitlaneError {
         Self::InvalidConfig {
             path: path.to_path_buf(),
             message: source.to_string(),
+        }
+    }
+
+    pub fn parse_config(path: &Path, source: impl Into<ConfigParseError>) -> Self {
+        Self::ParseConfig {
+            path: path.to_path_buf(),
+            source: source.into(),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ConfigParseError {
+    #[error(transparent)]
+    Toml(#[from] toml::de::Error),
+    #[error(transparent)]
+    Yaml(#[from] serde_yaml::Error),
+}
+
+impl ConfigParseError {
+    fn format_name(&self) -> &'static str {
+        match self {
+            Self::Toml(_) => "TOML",
+            Self::Yaml(_) => "YAML",
         }
     }
 }
