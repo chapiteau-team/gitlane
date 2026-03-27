@@ -1,99 +1,139 @@
 use std::{collections::BTreeMap, path::Path};
 
-use serde::Deserialize;
+use crate::errors::{ConfigValidationError, GitlaneError};
 
-use crate::{errors::GitlaneError, fs::read_text_file};
+pub(crate) mod templates;
+pub(crate) mod toml;
 
 type StateId = String;
 type TransitionId = String;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct WorkflowConfig {
-    state_ids: Vec<StateId>,
-}
-
-impl WorkflowConfig {
-    pub(crate) fn load_from_path(workflow_path: &Path) -> Result<Self, GitlaneError> {
-        let content = read_text_file(workflow_path)?;
-        let raw: RawWorkflowConfig =
-            toml::from_str(&content).map_err(|source| GitlaneError::ParseToml {
-                path: workflow_path.to_path_buf(),
-                source,
-            })?;
-
-        Self::from_raw(raw, workflow_path)
-    }
-
-    fn from_raw(raw: RawWorkflowConfig, workflow_path: &Path) -> Result<Self, GitlaneError> {
-        let RawWorkflowConfig {
-            initial_state,
-            states,
-            transitions,
-        } = raw;
-
-        validate_states(&states, workflow_path)?;
-        validate_initial_state(&initial_state, &states, workflow_path)?;
-
-        validate_transitions(&states, &transitions, workflow_path)?;
-
-        Ok(Self {
-            state_ids: states.into_keys().collect(),
-        })
-    }
-
-    pub(crate) fn state_ids(&self) -> impl Iterator<Item = &str> {
-        self.state_ids.iter().map(String::as_str)
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct RawWorkflowConfig {
     initial_state: StateId,
-    states: BTreeMap<StateId, RawWorkflowState>,
-    #[serde(default)]
-    transitions: BTreeMap<StateId, BTreeMap<TransitionId, RawWorkflowTransition>>,
+    states: BTreeMap<StateId, WorkflowState>,
+    transitions: BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>>,
 }
 
-#[derive(Debug, Deserialize)]
-struct RawWorkflowState {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WorkflowState {
     name: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct RawWorkflowTransition {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WorkflowTransition {
     name: String,
     to: StateId,
 }
 
+impl WorkflowConfig {
+    pub(crate) fn new(
+        initial_state: StateId,
+        states: BTreeMap<StateId, WorkflowState>,
+        transitions: BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>>,
+    ) -> Result<Self, ConfigValidationError> {
+        validate_states(&states)?;
+        validate_initial_state(&initial_state, &states)?;
+        validate_transitions(&states, &transitions)?;
+
+        Ok(Self {
+            initial_state,
+            states,
+            transitions,
+        })
+    }
+
+    pub(crate) fn load_from_path(workflow_path: &Path) -> Result<Self, GitlaneError> {
+        toml::load_from_path(workflow_path)
+    }
+
+    pub(crate) fn save_to_path(&self, workflow_path: &Path) -> Result<(), GitlaneError> {
+        toml::save_to_path(workflow_path, self)
+    }
+
+    pub(crate) fn initial_state(&self) -> &str {
+        &self.initial_state
+    }
+
+    pub(crate) fn state_ids(&self) -> impl Iterator<Item = &str> {
+        self.states.keys().map(String::as_str)
+    }
+
+    pub(crate) fn states(&self) -> &BTreeMap<StateId, WorkflowState> {
+        &self.states
+    }
+
+    pub(crate) fn transitions(
+        &self,
+    ) -> &BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>> {
+        &self.transitions
+    }
+}
+
+impl WorkflowState {
+    pub(crate) fn new(name: String) -> Result<Self, ConfigValidationError> {
+        if name.trim().is_empty() {
+            return Err(ConfigValidationError::new(
+                "workflow states must have a non-empty `name`",
+            ));
+        }
+
+        Ok(Self { name })
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl WorkflowTransition {
+    pub(crate) fn new(name: String, to: StateId) -> Result<Self, ConfigValidationError> {
+        if name.trim().is_empty() {
+            return Err(ConfigValidationError::new(
+                "workflow transitions must have a non-empty `name`",
+            ));
+        }
+
+        validate_id(
+            &to,
+            "workflow transitions must target a non-empty state id",
+            "workflow transitions must target a state id without leading or trailing whitespace",
+        )?;
+
+        Ok(Self { name, to })
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn to(&self) -> &str {
+        &self.to
+    }
+}
+
 fn validate_initial_state(
     initial_state: &StateId,
-    states: &BTreeMap<StateId, RawWorkflowState>,
-    workflow_path: &Path,
-) -> Result<(), GitlaneError> {
+    states: &BTreeMap<StateId, WorkflowState>,
+) -> Result<(), ConfigValidationError> {
     validate_id(
         initial_state,
         "`initial_state` must be a non-empty state id",
         "`initial_state` must not have leading or trailing whitespace",
-        workflow_path,
     )?;
 
     if !states.contains_key(initial_state) {
-        return Err(invalid_config_error(
-            workflow_path,
-            format!("`initial_state` references unknown state `{initial_state}`"),
-        ));
+        return Err(ConfigValidationError::new(format!(
+            "`initial_state` references unknown state `{initial_state}`"
+        )));
     }
 
     Ok(())
 }
 
-fn validate_states(
-    states: &BTreeMap<StateId, RawWorkflowState>,
-    workflow_path: &Path,
-) -> Result<(), GitlaneError> {
+fn validate_states(states: &BTreeMap<StateId, WorkflowState>) -> Result<(), ConfigValidationError> {
     if states.is_empty() {
-        return Err(invalid_config_error(
-            workflow_path,
+        return Err(ConfigValidationError::new(
             "`states` must declare at least one state",
         ));
     }
@@ -103,14 +143,12 @@ fn validate_states(
             state_id,
             "workflow state ids must be non-empty",
             "workflow state ids must not have leading or trailing whitespace",
-            workflow_path,
         )?;
 
-        if state.name.trim().is_empty() {
-            return Err(invalid_config_error(
-                workflow_path,
-                format!("workflow state `{state_id}` must have a non-empty `name`"),
-            ));
+        if state.name().trim().is_empty() {
+            return Err(ConfigValidationError::new(format!(
+                "workflow state `{state_id}` must have a non-empty `name`"
+            )));
         }
     }
 
@@ -118,23 +156,20 @@ fn validate_states(
 }
 
 fn validate_transitions(
-    states: &BTreeMap<StateId, RawWorkflowState>,
-    transitions: &BTreeMap<StateId, BTreeMap<TransitionId, RawWorkflowTransition>>,
-    workflow_path: &Path,
-) -> Result<(), GitlaneError> {
+    states: &BTreeMap<StateId, WorkflowState>,
+    transitions: &BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>>,
+) -> Result<(), ConfigValidationError> {
     for (from_state, transitions) in transitions {
         validate_id(
             from_state,
             "transition source ids must be non-empty",
             "transition source ids must not have leading or trailing whitespace",
-            workflow_path,
         )?;
 
         if !states.contains_key(from_state) {
-            return Err(invalid_config_error(
-                workflow_path,
-                format!("transition source `{from_state}` is not declared in `[states]`"),
-            ));
+            return Err(ConfigValidationError::new(format!(
+                "transition source `{from_state}` is not declared in `[states]`"
+            )));
         }
 
         for (transition_id, transition) in transitions {
@@ -144,37 +179,19 @@ fn validate_transitions(
                 format!(
                     "workflow transitions from `{from_state}` must not use ids with leading or trailing whitespace"
                 ),
-                workflow_path,
             )?;
 
-            if transition.name.trim().is_empty() {
-                return Err(invalid_config_error(
-                    workflow_path,
-                    format!(
-                        "workflow transition `{transition_id}` from `{from_state}` must have a non-empty `name`"
-                    ),
-                ));
+            if transition.name().trim().is_empty() {
+                return Err(ConfigValidationError::new(format!(
+                    "workflow transition `{transition_id}` from `{from_state}` must have a non-empty `name`"
+                )));
             }
 
-            validate_id(
-                &transition.to,
-                format!(
-                    "workflow transition `{transition_id}` from `{from_state}` must target a non-empty state id"
-                ),
-                format!(
-                    "workflow transition `{transition_id}` from `{from_state}` must target a state id without leading or trailing whitespace"
-                ),
-                workflow_path,
-            )?;
-
-            if !states.contains_key(&transition.to) {
-                return Err(invalid_config_error(
-                    workflow_path,
-                    format!(
-                        "workflow transition `{transition_id}` from `{from_state}` targets unknown state `{}`",
-                        transition.to
-                    ),
-                ));
+            if !states.contains_key(transition.to()) {
+                return Err(ConfigValidationError::new(format!(
+                    "workflow transition `{transition_id}` from `{from_state}` targets unknown state `{}`",
+                    transition.to()
+                )));
             }
         }
     }
@@ -186,24 +203,16 @@ fn validate_id(
     id: &str,
     empty_message: impl Into<String>,
     whitespace_message: impl Into<String>,
-    workflow_path: &Path,
-) -> Result<(), GitlaneError> {
+) -> Result<(), ConfigValidationError> {
     if id.is_empty() {
-        return Err(invalid_config_error(workflow_path, empty_message));
+        return Err(ConfigValidationError::new(empty_message));
     }
 
     if id.trim() != id {
-        return Err(invalid_config_error(workflow_path, whitespace_message));
+        return Err(ConfigValidationError::new(whitespace_message));
     }
 
     Ok(())
-}
-
-fn invalid_config_error(workflow_path: &Path, message: impl Into<String>) -> GitlaneError {
-    GitlaneError::InvalidConfig {
-        path: workflow_path.to_path_buf(),
-        message: message.into(),
-    }
 }
 
 #[cfg(test)]
@@ -214,10 +223,17 @@ mod tests {
 
     use tempfile::TempDir;
 
+    fn state(name: &str) -> WorkflowState {
+        WorkflowState::new(name.to_owned()).expect("workflow state should be valid")
+    }
+
+    fn transition(name: &str, to: &str) -> WorkflowTransition {
+        WorkflowTransition::new(name.to_owned(), to.to_owned())
+            .expect("workflow transition should be valid")
+    }
+
     fn parse_workflow_config(content: &str) -> Result<WorkflowConfig, GitlaneError> {
-        let raw: RawWorkflowConfig =
-            toml::from_str(content).expect("test workflow config snippets should be valid TOML");
-        WorkflowConfig::from_raw(raw, Path::new("workflow.toml"))
+        toml::parse_str(content, Path::new("workflow.toml"))
     }
 
     fn load_workflow_config(content: &str) -> Result<WorkflowConfig, GitlaneError> {
@@ -225,6 +241,25 @@ mod tests {
         let workflow_path = temp_dir.path().join("workflow.toml");
         fs::write(&workflow_path, content).expect("workflow config should be written");
         WorkflowConfig::load_from_path(&workflow_path)
+    }
+
+    #[test]
+    fn builds_valid_workflow_config() {
+        let workflow = WorkflowConfig::new(
+            "todo".to_owned(),
+            BTreeMap::from([
+                ("done".to_owned(), state("Done")),
+                ("todo".to_owned(), state("To Do")),
+            ]),
+            BTreeMap::from([(
+                "todo".to_owned(),
+                BTreeMap::from([("finish".to_owned(), transition("Finish", "done"))]),
+            )]),
+        )
+        .expect("workflow config should build");
+
+        assert_eq!(workflow.initial_state(), "todo");
+        assert_eq!(workflow.state_ids().collect::<Vec<_>>(), ["done", "todo"]);
     }
 
     #[test]
@@ -244,6 +279,17 @@ finish = { name = "Finish", to = "done" }
         .expect("workflow config should load");
 
         assert_eq!(workflow.state_ids().collect::<Vec<_>>(), ["done", "todo"]);
+    }
+
+    #[test]
+    fn default_template_builds_valid_workflow() {
+        let workflow = templates::default().expect("default workflow template should build");
+
+        assert_eq!(workflow.initial_state(), "todo");
+        assert_eq!(
+            workflow.state_ids().collect::<Vec<_>>(),
+            ["done", "in_progress", "review", "todo"]
+        );
     }
 
     #[test]
@@ -502,5 +548,31 @@ finish = { name = "Finish", to = "review" }
         .expect_err("unknown transition target should fail");
 
         assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
+    }
+
+    #[test]
+    fn saves_and_loads_toml_workflow() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let workflow_path = temp_dir.path().join("workflow.toml");
+        let workflow = WorkflowConfig::new(
+            "todo".to_owned(),
+            BTreeMap::from([
+                ("done".to_owned(), state("Done")),
+                ("todo".to_owned(), state("To Do")),
+            ]),
+            BTreeMap::from([(
+                "todo".to_owned(),
+                BTreeMap::from([("finish".to_owned(), transition("Finish", "done"))]),
+            )]),
+        )
+        .expect("workflow should be valid");
+
+        workflow
+            .save_to_path(&workflow_path)
+            .expect("workflow should save");
+        let loaded = WorkflowConfig::load_from_path(&workflow_path)
+            .expect("workflow should load after saving");
+
+        assert_eq!(loaded, workflow);
     }
 }

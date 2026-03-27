@@ -80,18 +80,6 @@ pub(crate) fn write_text_file(path: &Path, content: &str) -> Result<(), FsError>
     })
 }
 
-/// Write `content` only when `path` does not yet exist.
-///
-/// If `path` exists, it must be a file; directories and other non-file paths fail.
-pub(crate) fn write_file_if_missing(path: &Path, content: &str) -> Result<(), FsError> {
-    if path.exists() {
-        ensure_file(path)?;
-        return Ok(());
-    }
-
-    write_text_file(path, content)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,31 +123,6 @@ mod tests {
         fs::create_dir_all(&dir_path).expect("directory should be created");
 
         let err = ensure_file(&dir_path).expect_err("directory path should fail");
-
-        assert!(matches!(err, FsError::ExpectedFile { .. }));
-    }
-
-    #[test]
-    fn write_file_if_missing_writes_then_keeps_existing_file() {
-        let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let file_path = temp_dir.path().join("config.toml");
-
-        write_file_if_missing(&file_path, "first\n").expect("file should be written");
-        write_file_if_missing(&file_path, "second\n")
-            .expect("existing file should remain untouched");
-
-        let content = fs::read_to_string(&file_path).expect("file should be readable");
-        assert_eq!(content, "first\n");
-    }
-
-    #[test]
-    fn write_file_if_missing_errors_when_path_is_directory() {
-        let temp_dir = TempDir::new().expect("temp test directory should be created");
-        let dir_path = temp_dir.path().join("config");
-        fs::create_dir_all(&dir_path).expect("directory should be created");
-
-        let err =
-            write_file_if_missing(&dir_path, "value\n").expect_err("directory path should fail");
 
         assert!(matches!(err, FsError::ExpectedFile { .. }));
     }

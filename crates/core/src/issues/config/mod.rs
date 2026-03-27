@@ -1,0 +1,357 @@
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::Path,
+};
+
+use crate::errors::{ConfigValidationError, GitlaneError};
+
+pub(crate) mod templates;
+pub(crate) mod toml;
+
+type PriorityId = String;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct IssuesConfig {
+    issue_prefix: String,
+    priorities: BTreeMap<PriorityId, IssuePriority>,
+    priority_order: Vec<PriorityId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct IssuePriority {
+    name: String,
+    description: Option<String>,
+}
+
+impl IssuesConfig {
+    pub(crate) fn new(
+        issue_prefix: String,
+        priorities: BTreeMap<PriorityId, IssuePriority>,
+        priority_order: Vec<PriorityId>,
+    ) -> Result<Self, ConfigValidationError> {
+        validate_issue_prefix(&issue_prefix)?;
+        validate_priorities(&priorities)?;
+        validate_priority_order(&priorities, &priority_order)?;
+
+        Ok(Self {
+            issue_prefix,
+            priorities,
+            priority_order,
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn load_from_path(config_path: &Path) -> Result<Self, GitlaneError> {
+        toml::load_from_path(config_path)
+    }
+
+    pub(crate) fn save_to_path(&self, config_path: &Path) -> Result<(), GitlaneError> {
+        toml::save_to_path(config_path, self)
+    }
+
+    pub(crate) fn issue_prefix(&self) -> &str {
+        &self.issue_prefix
+    }
+
+    pub(crate) fn priorities(&self) -> &BTreeMap<PriorityId, IssuePriority> {
+        &self.priorities
+    }
+
+    pub(crate) fn priority_order(&self) -> &[PriorityId] {
+        &self.priority_order
+    }
+}
+
+impl IssuePriority {
+    pub(crate) fn new(
+        name: String,
+        description: Option<String>,
+    ) -> Result<Self, ConfigValidationError> {
+        if name.trim().is_empty() {
+            return Err(ConfigValidationError::new(
+                "issue priorities must have a non-empty `name`",
+            ));
+        }
+
+        Ok(Self { name, description })
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn description(&self) -> Option<&str> {
+        self.description.as_deref()
+    }
+}
+
+fn validate_issue_prefix(issue_prefix: &str) -> Result<(), ConfigValidationError> {
+    if issue_prefix.is_empty() {
+        return Err(ConfigValidationError::new(
+            "`issue_prefix` must be a non-empty string",
+        ));
+    }
+
+    if issue_prefix.trim() != issue_prefix {
+        return Err(ConfigValidationError::new(
+            "`issue_prefix` must not have leading or trailing whitespace",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_priorities(
+    priorities: &BTreeMap<PriorityId, IssuePriority>,
+) -> Result<(), ConfigValidationError> {
+    if priorities.is_empty() {
+        return Err(ConfigValidationError::new(
+            "`priorities` must declare at least one priority",
+        ));
+    }
+
+    for (priority_id, priority) in priorities {
+        validate_id(
+            priority_id,
+            "priority ids must be non-empty",
+            "priority ids must not have leading or trailing whitespace",
+        )?;
+
+        if priority.name().trim().is_empty() {
+            return Err(ConfigValidationError::new(format!(
+                "priority `{priority_id}` must have a non-empty `name`"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_priority_order(
+    priorities: &BTreeMap<PriorityId, IssuePriority>,
+    priority_order: &[PriorityId],
+) -> Result<(), ConfigValidationError> {
+    if priority_order.is_empty() {
+        return Err(ConfigValidationError::new(
+            "`priority_order` must contain every priority id exactly once",
+        ));
+    }
+
+    let mut seen = HashSet::with_capacity(priority_order.len());
+    for priority_id in priority_order {
+        validate_id(
+            priority_id,
+            "`priority_order` entries must be non-empty",
+            "`priority_order` entries must not have leading or trailing whitespace",
+        )?;
+
+        if !priorities.contains_key(priority_id) {
+            return Err(ConfigValidationError::new(format!(
+                "`priority_order` references unknown priority `{priority_id}`"
+            )));
+        }
+
+        if !seen.insert(priority_id.clone()) {
+            return Err(ConfigValidationError::new(format!(
+                "`priority_order` contains duplicate priority `{priority_id}`"
+            )));
+        }
+    }
+
+    if seen.len() != priorities.len() {
+        let missing = priorities
+            .keys()
+            .filter(|priority_id| !seen.contains(*priority_id))
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(ConfigValidationError::new(format!(
+            "`priority_order` is missing priorities: {missing}"
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_id(
+    id: &str,
+    empty_message: impl Into<String>,
+    whitespace_message: impl Into<String>,
+) -> Result<(), ConfigValidationError> {
+    if id.is_empty() {
+        return Err(ConfigValidationError::new(empty_message));
+    }
+
+    if id.trim() != id {
+        return Err(ConfigValidationError::new(whitespace_message));
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use tempfile::TempDir;
+
+    fn priority(name: &str, description: Option<&str>) -> IssuePriority {
+        IssuePriority::new(name.to_owned(), description.map(ToOwned::to_owned))
+            .expect("priority should be valid")
+    }
+
+    fn parse_issues_config(content: &str) -> Result<IssuesConfig, GitlaneError> {
+        toml::parse_str(content, Path::new("issues.toml"))
+    }
+
+    #[test]
+    fn builds_valid_issues_config() {
+        let config = IssuesConfig::new(
+            "ISS".to_owned(),
+            BTreeMap::from([
+                ("p0".to_owned(), priority("No Priority", None)),
+                (
+                    "p1".to_owned(),
+                    priority("Urgent", Some("Needs immediate attention")),
+                ),
+            ]),
+            vec!["p1".to_owned(), "p0".to_owned()],
+        )
+        .expect("issues config should build");
+
+        assert_eq!(config.issue_prefix(), "ISS");
+        assert_eq!(
+            config.priority_order(),
+            &["p1".to_string(), "p0".to_string()]
+        );
+    }
+
+    #[test]
+    fn parses_valid_toml_config() {
+        let config = parse_issues_config(
+            r#"
+issue_prefix = "ISS"
+priority_order = ["p1", "p0"]
+
+[priorities]
+p0 = { name = "No Priority" }
+p1 = { name = "Urgent", description = "Needs immediate attention" }
+"#,
+        )
+        .expect("issues config should parse");
+
+        assert_eq!(config.issue_prefix(), "ISS");
+        assert_eq!(
+            config.priority_order(),
+            &["p1".to_string(), "p0".to_string()]
+        );
+    }
+
+    #[test]
+    fn default_template_builds_valid_issues_config() {
+        let config = templates::default().expect("default issues template should build");
+
+        assert_eq!(config.issue_prefix(), "ISS");
+        assert_eq!(
+            config.priority_order(),
+            &[
+                "p1".to_string(),
+                "p2".to_string(),
+                "p3".to_string(),
+                "p4".to_string(),
+                "p0".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_empty_issue_prefix() {
+        let err = parse_issues_config(
+            r#"
+issue_prefix = ""
+priority_order = ["p1"]
+
+[priorities]
+p1 = { name = "Urgent" }
+"#,
+        )
+        .expect_err("empty prefix should fail");
+
+        assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
+    }
+
+    #[test]
+    fn rejects_duplicate_priority_in_order() {
+        let err = parse_issues_config(
+            r#"
+issue_prefix = "ISS"
+priority_order = ["p1", "p1"]
+
+[priorities]
+p1 = { name = "Urgent" }
+"#,
+        )
+        .expect_err("duplicate priority order should fail");
+
+        assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
+    }
+
+    #[test]
+    fn rejects_unknown_priority_in_order() {
+        let err = parse_issues_config(
+            r#"
+issue_prefix = "ISS"
+priority_order = ["p2"]
+
+[priorities]
+p1 = { name = "Urgent" }
+"#,
+        )
+        .expect_err("unknown ordered priority should fail");
+
+        assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
+    }
+
+    #[test]
+    fn rejects_missing_priority_from_order() {
+        let err = parse_issues_config(
+            r#"
+issue_prefix = "ISS"
+priority_order = ["p1"]
+
+[priorities]
+p0 = { name = "No Priority" }
+p1 = { name = "Urgent" }
+"#,
+        )
+        .expect_err("missing priority in order should fail");
+
+        assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
+    }
+
+    #[test]
+    fn saves_and_loads_toml_issues_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("issues.toml");
+        let config = IssuesConfig::new(
+            "ISS".to_owned(),
+            BTreeMap::from([
+                ("p0".to_owned(), priority("No Priority", None)),
+                (
+                    "p1".to_owned(),
+                    priority("Urgent", Some("Needs immediate attention")),
+                ),
+            ]),
+            vec!["p1".to_owned(), "p0".to_owned()],
+        )
+        .expect("issues config should be valid");
+
+        config
+            .save_to_path(&config_path)
+            .expect("issues config should save");
+        let loaded = IssuesConfig::load_from_path(&config_path)
+            .expect("issues config should load after saving");
+
+        assert_eq!(loaded, config);
+    }
+}

@@ -7,7 +7,7 @@ mod project;
 
 pub mod paths;
 
-pub use errors::{GitlaneError, PersonHandleError};
+pub use errors::{ConfigValidationError, GitlaneError};
 pub use gitlane::Gitlane;
 pub use init::InitOptions;
 pub use project::ProjectConfig;

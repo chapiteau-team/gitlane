@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
@@ -12,8 +12,6 @@ pub enum GitlaneError {
     ProjectAlreadyExists { path: PathBuf },
     #[error("invalid config in `{path}`: {message}")]
     InvalidConfig { path: PathBuf, message: String },
-    #[error(transparent)]
-    InvalidPersonHandle(#[from] PersonHandleError),
     #[error("failed to parse `{path}` as TOML")]
     ParseToml {
         path: PathBuf,
@@ -30,10 +28,25 @@ pub enum GitlaneError {
     Filesystem(#[from] FsError),
 }
 
-#[derive(Debug, Error)]
-pub enum PersonHandleError {
-    #[error("`people[{index}]` must be a non-empty handle")]
-    Empty { index: usize },
-    #[error("duplicate handle `{handle}` in `people`")]
-    Duplicate { handle: String },
+impl GitlaneError {
+    pub(crate) fn invalid_config(path: &Path, source: ConfigValidationError) -> Self {
+        Self::InvalidConfig {
+            path: path.to_path_buf(),
+            message: source.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("{message}")]
+pub struct ConfigValidationError {
+    message: String,
+}
+
+impl ConfigValidationError {
+    pub(crate) fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
 }

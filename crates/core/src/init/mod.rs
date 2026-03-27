@@ -4,26 +4,17 @@
 //! workflow/config/label files, and creates `project.toml`.
 
 use std::path::Path;
-use toml::Value;
 
 use crate::{
     errors::GitlaneError,
-    fs::{ensure_directory, ensure_file, write_file_if_missing, write_text_file},
-    issues::workflow::WorkflowConfig,
+    fs::{ensure_directory, ensure_file},
+    issues::{config, labels, workflow},
     paths::{
         ISSUES_CONFIG_FILE, ISSUES_DIR, ISSUES_LABELS_FILE, ISSUES_WORKFLOW_FILE,
         PROJECT_CONFIG_FILE,
     },
+    project::{self, ProjectConfig},
 };
-
-const ISSUES_WORKFLOW_TOML: &str = include_str!("scaffold/issues/workflow.toml");
-const ISSUES_CONFIG_TOML: &str = include_str!("scaffold/issues/issues.toml");
-const ISSUES_LABELS_TOML: &str = include_str!("scaffold/issues/labels.toml");
-const ISSUES_SCAFFOLD_FILES: [(&str, &str); 3] = [
-    (ISSUES_WORKFLOW_FILE, ISSUES_WORKFLOW_TOML),
-    (ISSUES_CONFIG_FILE, ISSUES_CONFIG_TOML),
-    (ISSUES_LABELS_FILE, ISSUES_LABELS_TOML),
-];
 
 /// Options that control new project initialization metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,7 +101,7 @@ fn ensure_issues_layout(project_path: &Path) -> Result<(), GitlaneError> {
 /// Ensure all workflow state directories exist under `issues_dir`.
 fn ensure_issue_state_dirs(issues_dir: &Path) -> Result<(), GitlaneError> {
     let workflow_path = issues_dir.join(ISSUES_WORKFLOW_FILE);
-    let workflow = WorkflowConfig::load_from_path(&workflow_path)?;
+    let workflow = workflow::WorkflowConfig::load_from_path(&workflow_path)?;
 
     for state in workflow.state_ids() {
         ensure_directory(&issues_dir.join(state))?;
@@ -121,40 +112,62 @@ fn ensure_issue_state_dirs(issues_dir: &Path) -> Result<(), GitlaneError> {
 
 /// Ensure default issue scaffold files exist under `issues_dir`.
 fn ensure_issue_scaffold_files(issues_dir: &Path) -> Result<(), GitlaneError> {
-    for (file_name, content) in ISSUES_SCAFFOLD_FILES {
-        write_file_if_missing(&issues_dir.join(file_name), content)?;
-    }
+    write_default_workflow_config_if_missing(issues_dir)?;
+    write_default_issues_config_if_missing(issues_dir)?;
+    write_default_labels_config_if_missing(issues_dir)?;
 
     Ok(())
 }
 
 /// Create `project.toml` from initialization options.
 fn create_project_config(config_path: &Path, options: &InitOptions) -> Result<(), GitlaneError> {
-    let content = render_project_toml(
-        options.project_name(),
-        options.description.as_deref(),
-        options.homepage.as_deref(),
-    );
-    write_text_file(config_path, &content)?;
+    let config = ProjectConfig::new(
+        options.project_name().to_owned(),
+        options.description.clone(),
+        options.homepage.clone(),
+        Vec::new(),
+    )
+    .map_err(|source| GitlaneError::invalid_config(config_path, source))?;
+    project::toml::save_to_path(config_path, &config)
+}
+
+fn write_default_workflow_config_if_missing(issues_dir: &Path) -> Result<(), GitlaneError> {
+    let workflow_path = issues_dir.join(ISSUES_WORKFLOW_FILE);
+    if workflow_path.exists() {
+        ensure_file(&workflow_path)?;
+        return Ok(());
+    }
+
+    let workflow = workflow::templates::default()
+        .map_err(|source| GitlaneError::invalid_config(&workflow_path, source))?;
+    workflow.save_to_path(&workflow_path)?;
     Ok(())
 }
 
-/// Render a minimal `project.toml` document from validated metadata.
-fn render_project_toml(name: &str, description: Option<&str>, homepage: Option<&str>) -> String {
-    let mut lines = vec![format!("name = {}", Value::String(name.to_owned()))];
-
-    if let Some(description) = description {
-        lines.push(format!(
-            "description = {}",
-            Value::String(description.to_owned())
-        ));
+fn write_default_issues_config_if_missing(issues_dir: &Path) -> Result<(), GitlaneError> {
+    let config_path = issues_dir.join(ISSUES_CONFIG_FILE);
+    if config_path.exists() {
+        ensure_file(&config_path)?;
+        return Ok(());
     }
 
-    if let Some(homepage) = homepage {
-        lines.push(format!("homepage = {}", Value::String(homepage.to_owned())));
+    let config = config::templates::default()
+        .map_err(|source| GitlaneError::invalid_config(&config_path, source))?;
+    config.save_to_path(&config_path)?;
+    Ok(())
+}
+
+fn write_default_labels_config_if_missing(issues_dir: &Path) -> Result<(), GitlaneError> {
+    let config_path = issues_dir.join(ISSUES_LABELS_FILE);
+    if config_path.exists() {
+        ensure_file(&config_path)?;
+        return Ok(());
     }
 
-    format!("{}\n", lines.join("\n"))
+    let config = labels::templates::default()
+        .map_err(|source| GitlaneError::invalid_config(&config_path, source))?;
+    config.save_to_path(&config_path)?;
+    Ok(())
 }
 
 #[cfg(test)]

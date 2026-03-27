@@ -96,7 +96,7 @@ name = ""
         );
 
         let err = Gitlane::load(project_dir).expect_err("invalid config should fail");
-        assert!(matches!(err, GitlaneError::InvalidProjectName));
+        assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
     }
 
     #[test]
