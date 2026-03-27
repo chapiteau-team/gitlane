@@ -8,9 +8,17 @@ Issue configuration is separate from workflow movement rules and labels.
 
 ### Configuration File
 
-Issue configuration lives in:
+Issue configuration may live in exactly one of:
 
-`.gitlane/issues/issues.toml`
+- `.gitlane/issues/issues.toml`
+- `.gitlane/issues/issues.yaml`
+- `.gitlane/issues/issues.yml`
+
+If more than one supported issue config file is present at the same time, Gitlane returns an error because the issue
+config is ambiguous.
+
+`gitlane init --format <FORMAT>` chooses which issue config file is created when one is missing. Supported values are
+`toml`, `yaml`, and `yml`. If `--format` is omitted, `gitlane init` defaults to `toml`.
 
 ### Required top-level fields
 
@@ -50,6 +58,8 @@ One common scheme is:
 In this scheme, `p1` is the highest priority and `p0` is the lowest priority.
 
 ### Example `.gitlane/issues/issues.toml`
+
+This is the default format produced by `gitlane init` when `--format` is not specified.
 
 ```toml
 issue_prefix = "ISS"
@@ -103,7 +113,7 @@ Format:
 
 Where:
 
-- `<prefix>` is `issue_prefix` from `.gitlane/issues/issues.toml`.
+- `<prefix>` is `issue_prefix` from the issue config file in `.gitlane/issues/issues.toml`, `.gitlane/issues/issues.yaml`, or `.gitlane/issues/issues.yml`.
 - `unix_ms` is current UTC time in milliseconds.
 - `base36(unix_ms)` is lowercase base36 encoding of `unix_ms`.
 
@@ -116,6 +126,8 @@ Collision strategy:
 ## Issue File Structure
 
 `issue.md` is Markdown with required TOML front matter, followed by a user-defined Markdown body.
+
+This front matter format is unchanged even when repository config files use YAML or YML.
 
 ```markdown
 +++
@@ -138,8 +150,8 @@ Required fields:
 - `updated_at`: RFC3339 UTC timestamp (`Z` suffix).
 - `reporter`: person reference string (for example, `@kalaninja`).
 - `assignees`: array of person reference strings.
-- `priority`: priority id from `.gitlane/issues/issues.toml`.
-- `labels`: array of label ids from `.gitlane/issues/labels.toml`.
+- `priority`: priority id from the issue config file.
+- `labels`: array of label ids from the labels config file.
 
 Semantics:
 
@@ -148,8 +160,8 @@ Semantics:
 - `updated_at` must be greater than or equal to `created_at`.
 - `assignees` must be unique.
 - `labels` must be unique.
-- If `people` exists in `.gitlane/project.toml`, `reporter` and every `assignees` value must be present in that list.
-- If `people` is omitted in `.gitlane/project.toml`, any non-empty person reference string is allowed.
+- If `people` exists in the project config file, `reporter` and every `assignees` value must be present in that list.
+- If `people` is omitted in the project config file, any non-empty person reference string is allowed.
 - Person reference format is repository-defined (for example, `@kalaninja`).
 - Metadata key order has no semantic meaning.
 - Unknown metadata keys are allowed for forward compatibility.

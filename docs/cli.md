@@ -11,12 +11,12 @@ gitlane [OPTIONS] <COMMAND>
 Global options:
 
 - `--project <PATH>`:
-    - For `init`: target project root where `.gitlane` is created. If `.gitlane/project.toml` already exists, `init`
-      returns an error. If omitted, uses current directory.
+    - For `init`: target project root where `.gitlane` is created. If `.gitlane/project.toml`, `.gitlane/project.yaml`,
+      or `.gitlane/project.yml` already exists, `init` returns an error. If omitted, uses current directory.
     - For other commands: path used as the starting point for `.gitlane` discovery. If omitted, starts from current
       directory. Discovery walks up parent directories (same style as `.git` discovery) and accepts either a
       `.gitlane` directory directly or a directory containing `.gitlane`. The resolved `.gitlane` directory must
-      contain `project.toml`.
+      contain exactly one supported project config file: `project.toml`, `project.yaml`, or `project.yml`.
       Project config schema is documented in [`docs/project.md`](project.md).
 
 ## Supported Commands
@@ -51,38 +51,48 @@ Commands other than `init` are currently scaffolded.
 - Usage:
 
   ```bash
-  gitlane [--project <PATH>] init [--name <NAME>] [--description <TEXT>] [--homepage <URL>]
+  gitlane [--project <PATH>] init [--name <NAME>] [--description <TEXT>] [--homepage <URL>] [--format <FORMAT>]
   ```
 
 - Options:
-    - `--name <NAME>`: set project name in `.gitlane/project.toml`.
-    - `--description <TEXT>`: set project description in `.gitlane/project.toml`.
-    - `--homepage <URL>`: set project homepage in `.gitlane/project.toml`.
+    - `--name <NAME>`: set project name in the project config file created by `init`.
+    - `--description <TEXT>`: set project description in the project config file created by `init`.
+    - `--homepage <URL>`: set project homepage in the project config file created by `init`.
+    - `--format <FORMAT>`: choose config file format for files created by `init`. Supported values: `toml`, `yaml`,
+      `yml`. Default: `toml`.
 
 ### Behavior
 
 - Target project root is created when missing.
-- If `.gitlane/project.toml` already exists, `init` fails and leaves the existing project unchanged.
-- If `.gitlane/` exists but `project.toml` is missing, `init` treats it as a partial scaffold and creates the missing
-  files and directories.
-- `--name`, `--description`, and `--homepage` are used only when creating `.gitlane/project.toml`.
-- Issue state directories are derived from `.gitlane/issues/workflow.toml`; `init` fails if the workflow config is invalid.
+- If a supported project config file already exists, `init` fails and leaves the existing project unchanged.
+- If `.gitlane/` exists but no supported project config file exists, `init` treats it as a partial scaffold and creates
+  the missing files and directories.
+- `--name`, `--description`, and `--homepage` are used only when creating a new project config file.
+- `--format` selects the extension and serialization used for any config files created during that `init` invocation.
+  If omitted, `init` defaults to `toml`.
+- If more than one supported config file exists for the same logical config (`project`, `workflow`, `issues`, or
+  `labels`), Gitlane returns an error instead of guessing which file to use.
+- Issue state directories are derived from `.gitlane/issues/workflow.<ext>`; `init` fails if the workflow config is invalid.
 
 ### Files and directories created when missing
 
 ```text
 .gitlane/
-  project.toml
+  project.<ext>
   issues/
-    workflow.toml
-    issues.toml
-    labels.toml
+    workflow.<ext>
+    issues.<ext>
+    labels.<ext>
     <one directory per workflow state>
 ```
+
+`<ext>` is `toml` by default, or the extension selected by `--format`.
 
 For the default scaffolded workflow, `init` creates `todo/`, `in_progress/`, `review/`, and `done/`.
 
 ### Default bootstrap configs
+
+For `--format toml` (the default), `init` creates the following config content.
 
 `workflow.toml`:
 
@@ -139,10 +149,14 @@ needs_decision = { name = "Needs Decision", description = "Requires product or t
 good_first_issue = { name = "Good First Issue", description = "Suitable for new contributors", color = "#0369a1" }
 ```
 
+When `--format yaml` or `--format yml` is used, Gitlane writes the same logical config data as YAML into `.yaml` or
+`.yml` files.
+
 ### Examples
 
 ```bash
 gitlane init
+gitlane init --format yaml
 gitlane --project ../my-repo init --name "My Repo"
 gitlane init --description "Git-native tracker" --homepage "https://example.com"
 ```
