@@ -2,32 +2,32 @@ use std::{collections::BTreeMap, path::Path};
 
 use crate::errors::{ConfigValidationError, GitlaneError};
 
-pub(crate) mod templates;
-pub(crate) mod toml;
+pub mod templates;
+pub mod toml;
 
-type StateId = String;
-type TransitionId = String;
+pub type StateId = String;
+pub type TransitionId = String;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct WorkflowConfig {
+pub struct WorkflowConfig {
     initial_state: StateId,
     states: BTreeMap<StateId, WorkflowState>,
     transitions: BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct WorkflowState {
+pub struct WorkflowState {
     name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct WorkflowTransition {
+pub struct WorkflowTransition {
     name: String,
     to: StateId,
 }
 
 impl WorkflowConfig {
-    pub(crate) fn new(
+    pub fn new(
         initial_state: StateId,
         states: BTreeMap<StateId, WorkflowState>,
         transitions: BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>>,
@@ -43,35 +43,33 @@ impl WorkflowConfig {
         })
     }
 
-    pub(crate) fn load_from_path(workflow_path: &Path) -> Result<Self, GitlaneError> {
+    pub fn load_from_path(workflow_path: &Path) -> Result<Self, GitlaneError> {
         toml::load_from_path(workflow_path)
     }
 
-    pub(crate) fn save_to_path(&self, workflow_path: &Path) -> Result<(), GitlaneError> {
+    pub fn save_to_path(&self, workflow_path: &Path) -> Result<(), GitlaneError> {
         toml::save_to_path(workflow_path, self)
     }
 
-    pub(crate) fn initial_state(&self) -> &str {
+    pub fn initial_state(&self) -> &str {
         &self.initial_state
     }
 
-    pub(crate) fn state_ids(&self) -> impl Iterator<Item = &str> {
+    pub fn state_ids(&self) -> impl Iterator<Item = &str> {
         self.states.keys().map(String::as_str)
     }
 
-    pub(crate) fn states(&self) -> &BTreeMap<StateId, WorkflowState> {
+    pub fn states(&self) -> &BTreeMap<StateId, WorkflowState> {
         &self.states
     }
 
-    pub(crate) fn transitions(
-        &self,
-    ) -> &BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>> {
+    pub fn transitions(&self) -> &BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>> {
         &self.transitions
     }
 }
 
 impl WorkflowState {
-    pub(crate) fn new(name: String) -> Result<Self, ConfigValidationError> {
+    pub fn new(name: String) -> Result<Self, ConfigValidationError> {
         if name.trim().is_empty() {
             return Err(ConfigValidationError::new(
                 "workflow states must have a non-empty `name`",
@@ -81,13 +79,13 @@ impl WorkflowState {
         Ok(Self { name })
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 }
 
 impl WorkflowTransition {
-    pub(crate) fn new(name: String, to: StateId) -> Result<Self, ConfigValidationError> {
+    pub fn new(name: String, to: StateId) -> Result<Self, ConfigValidationError> {
         if name.trim().is_empty() {
             return Err(ConfigValidationError::new(
                 "workflow transitions must have a non-empty `name`",
@@ -103,11 +101,11 @@ impl WorkflowTransition {
         Ok(Self { name, to })
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 
-    pub(crate) fn to(&self) -> &str {
+    pub fn to(&self) -> &str {
         &self.to
     }
 }

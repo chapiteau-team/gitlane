@@ -5,26 +5,26 @@ use std::{
 
 use crate::errors::{ConfigValidationError, GitlaneError};
 
-pub(crate) mod templates;
-pub(crate) mod toml;
+pub mod templates;
+pub mod toml;
 
-type PriorityId = String;
+pub type PriorityId = String;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct IssuesConfig {
+pub struct IssuesConfig {
     issue_prefix: String,
     priorities: BTreeMap<PriorityId, IssuePriority>,
     priority_order: Vec<PriorityId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct IssuePriority {
+pub struct IssuePriority {
     name: String,
     description: Option<String>,
 }
 
 impl IssuesConfig {
-    pub(crate) fn new(
+    pub fn new(
         issue_prefix: String,
         priorities: BTreeMap<PriorityId, IssuePriority>,
         priority_order: Vec<PriorityId>,
@@ -40,33 +40,29 @@ impl IssuesConfig {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn load_from_path(config_path: &Path) -> Result<Self, GitlaneError> {
+    pub fn load_from_path(config_path: &Path) -> Result<Self, GitlaneError> {
         toml::load_from_path(config_path)
     }
 
-    pub(crate) fn save_to_path(&self, config_path: &Path) -> Result<(), GitlaneError> {
+    pub fn save_to_path(&self, config_path: &Path) -> Result<(), GitlaneError> {
         toml::save_to_path(config_path, self)
     }
 
-    pub(crate) fn issue_prefix(&self) -> &str {
+    pub fn issue_prefix(&self) -> &str {
         &self.issue_prefix
     }
 
-    pub(crate) fn priorities(&self) -> &BTreeMap<PriorityId, IssuePriority> {
+    pub fn priorities(&self) -> &BTreeMap<PriorityId, IssuePriority> {
         &self.priorities
     }
 
-    pub(crate) fn priority_order(&self) -> &[PriorityId] {
+    pub fn priority_order(&self) -> &[PriorityId] {
         &self.priority_order
     }
 }
 
 impl IssuePriority {
-    pub(crate) fn new(
-        name: String,
-        description: Option<String>,
-    ) -> Result<Self, ConfigValidationError> {
+    pub fn new(name: String, description: Option<String>) -> Result<Self, ConfigValidationError> {
         if name.trim().is_empty() {
             return Err(ConfigValidationError::new(
                 "issue priorities must have a non-empty `name`",
@@ -76,11 +72,11 @@ impl IssuePriority {
         Ok(Self { name, description })
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 
-    pub(crate) fn description(&self) -> Option<&str> {
+    pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
 }

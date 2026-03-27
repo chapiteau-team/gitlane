@@ -4,7 +4,7 @@ use crate::errors::ConfigValidationError;
 
 use super::{WorkflowConfig, WorkflowState, WorkflowTransition};
 
-pub(crate) fn default() -> Result<WorkflowConfig, ConfigValidationError> {
+pub fn default() -> Result<WorkflowConfig, ConfigValidationError> {
     WorkflowConfig::new(
         "todo".to_owned(),
         BTreeMap::from([

@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{errors::GitlaneError, fs::write_text_file};
 
-#[cfg(test)]
 use crate::fs::read_text_file;
 
 use super::{Label, LabelGroup, LabelGroupId, LabelId, LabelsConfig};
@@ -112,14 +111,12 @@ impl From<&LabelsConfig> for RawLabelsConfig {
     }
 }
 
-#[cfg(test)]
-pub(crate) fn load_from_path(config_path: &Path) -> Result<LabelsConfig, GitlaneError> {
+pub fn load_from_path(config_path: &Path) -> Result<LabelsConfig, GitlaneError> {
     let content = read_text_file(config_path)?;
     parse_str(&content, config_path)
 }
 
-#[cfg(test)]
-pub(crate) fn parse_str(content: &str, config_path: &Path) -> Result<LabelsConfig, GitlaneError> {
+pub fn parse_str(content: &str, config_path: &Path) -> Result<LabelsConfig, GitlaneError> {
     let raw: RawLabelsConfig =
         ::toml::from_str(content).map_err(|source| GitlaneError::ParseToml {
             path: config_path.to_path_buf(),
@@ -130,7 +127,7 @@ pub(crate) fn parse_str(content: &str, config_path: &Path) -> Result<LabelsConfi
         .map_err(|source| GitlaneError::invalid_config(config_path, source))
 }
 
-pub(crate) fn to_string(config: &LabelsConfig, config_path: &Path) -> Result<String, GitlaneError> {
+pub fn to_string(config: &LabelsConfig, config_path: &Path) -> Result<String, GitlaneError> {
     ::toml::to_string(&RawLabelsConfig::from(config)).map_err(|source| {
         GitlaneError::SerializeToml {
             path: config_path.to_path_buf(),
@@ -139,7 +136,7 @@ pub(crate) fn to_string(config: &LabelsConfig, config_path: &Path) -> Result<Str
     })
 }
 
-pub(crate) fn save_to_path(config_path: &Path, config: &LabelsConfig) -> Result<(), GitlaneError> {
+pub fn save_to_path(config_path: &Path, config: &LabelsConfig) -> Result<(), GitlaneError> {
     let content = to_string(config, config_path)?;
     write_text_file(config_path, &content)?;
     Ok(())

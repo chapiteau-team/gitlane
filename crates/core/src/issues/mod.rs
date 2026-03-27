@@ -1,5 +1,5 @@
 //! Issue feature modules.
 
-pub(crate) mod config;
-pub(crate) mod labels;
-pub(crate) mod workflow;
+pub mod config;
+pub mod labels;
+pub mod workflow;

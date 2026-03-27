@@ -29,7 +29,7 @@ pub enum GitlaneError {
 }
 
 impl GitlaneError {
-    pub(crate) fn invalid_config(path: &Path, source: ConfigValidationError) -> Self {
+    pub fn invalid_config(path: &Path, source: ConfigValidationError) -> Self {
         Self::InvalidConfig {
             path: path.to_path_buf(),
             message: source.to_string(),
@@ -44,7 +44,7 @@ pub struct ConfigValidationError {
 }
 
 impl ConfigValidationError {
-    pub(crate) fn new(message: impl Into<String>) -> Self {
+    pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
         }

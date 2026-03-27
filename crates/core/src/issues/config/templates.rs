@@ -4,7 +4,7 @@ use crate::errors::ConfigValidationError;
 
 use super::{IssuePriority, IssuesConfig};
 
-pub(crate) fn default() -> Result<IssuesConfig, ConfigValidationError> {
+pub fn default() -> Result<IssuesConfig, ConfigValidationError> {
     IssuesConfig::new(
         "ISS".to_owned(),
         BTreeMap::from([

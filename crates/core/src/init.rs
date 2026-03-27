@@ -61,7 +61,7 @@ impl InitOptions {
 ///
 /// This creates missing directories, scaffolds issue files, and creates a new
 /// `project.toml` when one does not already exist.
-pub(crate) fn initialize(project_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
+pub fn initialize(project_path: &Path, options: InitOptions) -> Result<(), GitlaneError> {
     ensure_project_root(project_path)?;
     ensure_project_config_missing(project_path)?;
     ensure_issues_layout(project_path)?;

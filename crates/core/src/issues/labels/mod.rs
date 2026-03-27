@@ -2,27 +2,27 @@ use std::{collections::BTreeMap, path::Path};
 
 use crate::errors::{ConfigValidationError, GitlaneError};
 
-pub(crate) mod templates;
-pub(crate) mod toml;
+pub mod templates;
+pub mod toml;
 
-type LabelId = String;
-type LabelGroupId = String;
+pub type LabelId = String;
+pub type LabelGroupId = String;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct LabelsConfig {
+pub struct LabelsConfig {
     label_groups: BTreeMap<LabelGroupId, LabelGroup>,
     labels: BTreeMap<LabelId, Label>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct LabelGroup {
+pub struct LabelGroup {
     name: String,
     description: Option<String>,
     color: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Label {
+pub struct Label {
     name: String,
     description: Option<String>,
     color: Option<String>,
@@ -30,7 +30,7 @@ pub(crate) struct Label {
 }
 
 impl LabelsConfig {
-    pub(crate) fn new(
+    pub fn new(
         label_groups: BTreeMap<LabelGroupId, LabelGroup>,
         labels: BTreeMap<LabelId, Label>,
     ) -> Result<Self, ConfigValidationError> {
@@ -43,25 +43,23 @@ impl LabelsConfig {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn load_from_path(config_path: &Path) -> Result<Self, GitlaneError> {
+    pub fn load_from_path(config_path: &Path) -> Result<Self, GitlaneError> {
         toml::load_from_path(config_path)
     }
 
-    pub(crate) fn save_to_path(&self, config_path: &Path) -> Result<(), GitlaneError> {
+    pub fn save_to_path(&self, config_path: &Path) -> Result<(), GitlaneError> {
         toml::save_to_path(config_path, self)
     }
 
-    pub(crate) fn label_groups(&self) -> &BTreeMap<LabelGroupId, LabelGroup> {
+    pub fn label_groups(&self) -> &BTreeMap<LabelGroupId, LabelGroup> {
         &self.label_groups
     }
 
-    pub(crate) fn labels(&self) -> &BTreeMap<LabelId, Label> {
+    pub fn labels(&self) -> &BTreeMap<LabelId, Label> {
         &self.labels
     }
 
-    #[cfg(test)]
-    pub(crate) fn resolved_color(&self, label_id: &str) -> Option<&str> {
+    pub fn resolved_color(&self, label_id: &str) -> Option<&str> {
         let label = self.labels.get(label_id)?;
         label.color().or_else(|| {
             label
@@ -73,7 +71,7 @@ impl LabelsConfig {
 }
 
 impl LabelGroup {
-    pub(crate) fn new(
+    pub fn new(
         name: String,
         description: Option<String>,
         color: Option<String>,
@@ -91,21 +89,21 @@ impl LabelGroup {
         })
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 
-    pub(crate) fn description(&self) -> Option<&str> {
+    pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
 
-    pub(crate) fn color(&self) -> Option<&str> {
+    pub fn color(&self) -> Option<&str> {
         self.color.as_deref()
     }
 }
 
 impl Label {
-    pub(crate) fn new(
+    pub fn new(
         name: String,
         description: Option<String>,
         color: Option<String>,
@@ -125,19 +123,19 @@ impl Label {
         })
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 
-    pub(crate) fn description(&self) -> Option<&str> {
+    pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
 
-    pub(crate) fn color(&self) -> Option<&str> {
+    pub fn color(&self) -> Option<&str> {
         self.color.as_deref()
     }
 
-    pub(crate) fn group(&self) -> Option<&str> {
+    pub fn group(&self) -> Option<&str> {
         self.group.as_deref()
     }
 }

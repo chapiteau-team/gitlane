@@ -4,7 +4,7 @@ use crate::errors::ConfigValidationError;
 
 use super::{Label, LabelGroup, LabelsConfig};
 
-pub(crate) fn default() -> Result<LabelsConfig, ConfigValidationError> {
+pub fn default() -> Result<LabelsConfig, ConfigValidationError> {
     LabelsConfig::new(
         BTreeMap::from([(
             "type".to_owned(),

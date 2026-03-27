@@ -32,16 +32,16 @@ impl From<&ProjectConfig> for RawProjectConfig {
     }
 }
 
-pub(crate) fn load(project_dir: &Path) -> Result<ProjectConfig, GitlaneError> {
+pub fn load(project_dir: &Path) -> Result<ProjectConfig, GitlaneError> {
     load_from_path(&project_dir.join(PROJECT_CONFIG_FILE))
 }
 
-pub(crate) fn load_from_path(config_path: &Path) -> Result<ProjectConfig, GitlaneError> {
+pub fn load_from_path(config_path: &Path) -> Result<ProjectConfig, GitlaneError> {
     let content = read_text_file(config_path)?;
     parse_str(&content, config_path)
 }
 
-pub(crate) fn parse_str(content: &str, config_path: &Path) -> Result<ProjectConfig, GitlaneError> {
+pub fn parse_str(content: &str, config_path: &Path) -> Result<ProjectConfig, GitlaneError> {
     let raw: RawProjectConfig =
         ::toml::from_str(content).map_err(|source| GitlaneError::ParseToml {
             path: config_path.to_path_buf(),
@@ -52,10 +52,7 @@ pub(crate) fn parse_str(content: &str, config_path: &Path) -> Result<ProjectConf
         .map_err(|source| GitlaneError::invalid_config(config_path, source))
 }
 
-pub(crate) fn to_string(
-    config: &ProjectConfig,
-    config_path: &Path,
-) -> Result<String, GitlaneError> {
+pub fn to_string(config: &ProjectConfig, config_path: &Path) -> Result<String, GitlaneError> {
     ::toml::to_string(&RawProjectConfig::from(config)).map_err(|source| {
         GitlaneError::SerializeToml {
             path: config_path.to_path_buf(),
@@ -64,7 +61,7 @@ pub(crate) fn to_string(
     })
 }
 
-pub(crate) fn save_to_path(config_path: &Path, config: &ProjectConfig) -> Result<(), GitlaneError> {
+pub fn save_to_path(config_path: &Path, config: &ProjectConfig) -> Result<(), GitlaneError> {
     let content = to_string(config, config_path)?;
     write_text_file(config_path, &content)?;
     Ok(())

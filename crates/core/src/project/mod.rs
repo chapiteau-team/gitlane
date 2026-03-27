@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::Path};
 
 use crate::errors::{ConfigValidationError, GitlaneError};
 
-pub(crate) mod toml;
+pub mod toml;
 
 /// Validated project metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]

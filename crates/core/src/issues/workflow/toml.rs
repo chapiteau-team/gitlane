@@ -123,15 +123,12 @@ impl From<&WorkflowConfig> for RawWorkflowConfig {
     }
 }
 
-pub(crate) fn load_from_path(workflow_path: &Path) -> Result<WorkflowConfig, GitlaneError> {
+pub fn load_from_path(workflow_path: &Path) -> Result<WorkflowConfig, GitlaneError> {
     let content = read_text_file(workflow_path)?;
     parse_str(&content, workflow_path)
 }
 
-pub(crate) fn parse_str(
-    content: &str,
-    workflow_path: &Path,
-) -> Result<WorkflowConfig, GitlaneError> {
+pub fn parse_str(content: &str, workflow_path: &Path) -> Result<WorkflowConfig, GitlaneError> {
     let raw: RawWorkflowConfig =
         ::toml::from_str(content).map_err(|source| GitlaneError::ParseToml {
             path: workflow_path.to_path_buf(),
@@ -142,10 +139,7 @@ pub(crate) fn parse_str(
         .map_err(|source| GitlaneError::invalid_config(workflow_path, source))
 }
 
-pub(crate) fn to_string(
-    config: &WorkflowConfig,
-    workflow_path: &Path,
-) -> Result<String, GitlaneError> {
+pub fn to_string(config: &WorkflowConfig, workflow_path: &Path) -> Result<String, GitlaneError> {
     ::toml::to_string(&RawWorkflowConfig::from(config)).map_err(|source| {
         GitlaneError::SerializeToml {
             path: workflow_path.to_path_buf(),
@@ -154,10 +148,7 @@ pub(crate) fn to_string(
     })
 }
 
-pub(crate) fn save_to_path(
-    workflow_path: &Path,
-    config: &WorkflowConfig,
-) -> Result<(), GitlaneError> {
+pub fn save_to_path(workflow_path: &Path, config: &WorkflowConfig) -> Result<(), GitlaneError> {
     let content = to_string(config, workflow_path)?;
     write_text_file(workflow_path, &content)?;
     Ok(())
