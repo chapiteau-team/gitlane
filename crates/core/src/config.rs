@@ -1,12 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
-
-use crate::{
-    errors::{ConfigParseError, ConfigValidationError, GitlaneError},
-    fs::{read_text_file, write_text_file},
-    paths::ISSUES_DIR,
-};
+use crate::{errors::GitlaneError, fs::ensure_file, paths::ISSUES_DIR};
 
 pub const PROJECT_CONFIG_STEM: &str = "project";
 pub const WORKFLOW_CONFIG_STEM: &str = "workflow";
@@ -88,6 +82,29 @@ pub fn config_candidate_paths(project_dir: &Path, kind: ConfigKind) -> [PathBuf;
     ConfigFileExtension::all().map(|extension| config_path(project_dir, kind, extension))
 }
 
+pub fn discover_config_path(
+    project_dir: &Path,
+    kind: ConfigKind,
+) -> Result<Option<PathBuf>, GitlaneError> {
+    let mut matches = Vec::new();
+
+    for candidate in config_candidate_paths(project_dir, kind) {
+        if candidate.exists() {
+            ensure_file(&candidate)?;
+            matches.push(candidate);
+        }
+    }
+
+    match matches.len() {
+        0 => Ok(None),
+        1 => Ok(matches.pop()),
+        _ => Err(GitlaneError::AmbiguousConfigFiles {
+            config_name: kind.stem(),
+            paths: matches,
+        }),
+    }
+}
+
 fn config_dir(project_dir: &Path, kind: ConfigKind) -> PathBuf {
     match kind {
         ConfigKind::Project => project_dir.to_path_buf(),
@@ -95,75 +112,6 @@ fn config_dir(project_dir: &Path, kind: ConfigKind) -> PathBuf {
             project_dir.join(ISSUES_DIR)
         }
     }
-}
-
-pub(crate) fn validate_non_blank(
-    value: &str,
-    message: impl Into<String>,
-) -> Result<(), ConfigValidationError> {
-    if value.trim().is_empty() {
-        return Err(ConfigValidationError::new(message));
-    }
-
-    Ok(())
-}
-
-pub(crate) fn validate_id(
-    id: &str,
-    empty_message: impl Into<String>,
-    whitespace_message: impl Into<String>,
-) -> Result<(), ConfigValidationError> {
-    if id.is_empty() {
-        return Err(ConfigValidationError::new(empty_message));
-    }
-
-    if id.trim() != id {
-        return Err(ConfigValidationError::new(whitespace_message));
-    }
-
-    Ok(())
-}
-
-pub(crate) fn load_config_from_path<T>(
-    config_path: &Path,
-    parse: impl FnOnce(&str, &Path) -> Result<T, GitlaneError>,
-) -> Result<T, GitlaneError> {
-    let content = read_text_file(config_path)?;
-    parse(&content, config_path)
-}
-
-pub(crate) fn parse_config<T, Repr, E>(
-    content: &str,
-    config_path: &Path,
-    parse: impl FnOnce(&str) -> Result<Repr, E>,
-) -> Result<T, GitlaneError>
-where
-    T: TryFrom<Repr, Error = ConfigValidationError>,
-    E: Into<ConfigParseError>,
-{
-    let repr = parse(content).map_err(|source| GitlaneError::parse_config(config_path, source))?;
-
-    repr.try_into()
-        .map_err(|source| GitlaneError::invalid_config(config_path, source))
-}
-
-pub(crate) fn to_toml_string<T: Serialize>(
-    value: &T,
-    config_path: &Path,
-) -> Result<String, GitlaneError> {
-    ::toml::to_string(value).map_err(|source| GitlaneError::SerializeToml {
-        path: config_path.to_path_buf(),
-        source,
-    })
-}
-
-pub(crate) fn save_toml_config<T: Serialize>(
-    config_path: &Path,
-    value: &T,
-) -> Result<(), GitlaneError> {
-    let content = to_toml_string(value, config_path)?;
-    write_text_file(config_path, &content)?;
-    Ok(())
 }
 
 macro_rules! impl_config {
@@ -176,6 +124,21 @@ macro_rules! impl_config {
                     $crate::config::ConfigFileExtension::Toml => toml::load_from_path(config_path),
                     $crate::config::ConfigFileExtension::Yaml
                     | $crate::config::ConfigFileExtension::Yml => yaml::load_from_path(config_path),
+                }
+            }
+
+            pub fn save_to_path(
+                &self,
+                config_path: &std::path::Path,
+            ) -> Result<(), $crate::errors::GitlaneError> {
+                match $crate::config::ConfigFileExtension::from_path(config_path)? {
+                    $crate::config::ConfigFileExtension::Toml => {
+                        toml::save_to_path(config_path, self)
+                    }
+                    $crate::config::ConfigFileExtension::Yaml
+                    | $crate::config::ConfigFileExtension::Yml => {
+                        yaml::save_to_path(config_path, self)
+                    }
                 }
             }
         }

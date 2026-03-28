@@ -1,8 +1,9 @@
-use std::{collections::BTreeMap, path::Path};
+use std::collections::BTreeMap;
 
 use crate::{
-    config::{impl_config, validate_id, validate_non_blank},
-    errors::{ConfigValidationError, GitlaneError},
+    config::impl_config,
+    errors::ConfigValidationError,
+    validate::{validate_id, validate_non_blank},
 };
 
 mod codec;
@@ -19,8 +20,6 @@ pub struct LabelsConfig {
     labels: BTreeMap<LabelId, Label>,
 }
 
-impl_config!(LabelsConfig);
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LabelGroup {
     name: String,
@@ -36,6 +35,8 @@ pub struct Label {
     group: Option<LabelGroupId>,
 }
 
+impl_config!(LabelsConfig);
+
 impl LabelsConfig {
     pub fn new(
         label_groups: BTreeMap<LabelGroupId, LabelGroup>,
@@ -48,10 +49,6 @@ impl LabelsConfig {
             label_groups,
             labels,
         })
-    }
-
-    pub fn save_to_path(&self, config_path: &Path) -> Result<(), GitlaneError> {
-        toml::save_to_path(config_path, self)
     }
 
     pub fn label_groups(&self) -> &BTreeMap<LabelGroupId, LabelGroup> {
@@ -194,8 +191,9 @@ fn validate_labels(
 mod tests {
     use super::*;
 
-    use std::fs;
+    use std::{fs, path::Path};
 
+    use crate::errors::GitlaneError;
     use tempfile::TempDir;
 
     fn label_group(name: &str, color: Option<&str>) -> LabelGroup {
@@ -346,6 +344,31 @@ type_bug = { name = "   " }
     }
 
     #[test]
+    fn saves_and_loads_yaml_labels_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("labels.yaml");
+        let config = LabelsConfig::new(
+            BTreeMap::from([("type".to_owned(), label_group("Type", Some("#334155")))]),
+            BTreeMap::from([
+                (
+                    "blocked".to_owned(),
+                    label("Blocked", Some("#b91c1c"), None),
+                ),
+                ("type_bug".to_owned(), label("Bug", None, Some("type"))),
+            ]),
+        )
+        .expect("labels config should be valid");
+
+        config
+            .save_to_path(&config_path)
+            .expect("yaml labels config should save");
+        let loaded = LabelsConfig::load_from_path(&config_path)
+            .expect("yaml labels config should load after saving");
+
+        assert_eq!(loaded, config);
+    }
+
+    #[test]
     fn loads_yml_labels_config() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let config_path = temp_dir.path().join("labels.yml");
@@ -364,5 +387,27 @@ type_bug = { name = "   " }
             LabelsConfig::load_from_path(&config_path).expect("yml labels config should load");
 
         assert_eq!(config.resolved_color("blocked"), Some("#b91c1c"));
+    }
+
+    #[test]
+    fn saves_and_loads_yml_labels_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("labels.yml");
+        let config = LabelsConfig::new(
+            BTreeMap::new(),
+            BTreeMap::from([(
+                "blocked".to_owned(),
+                label("Blocked", Some("#b91c1c"), None),
+            )]),
+        )
+        .expect("labels config should be valid");
+
+        config
+            .save_to_path(&config_path)
+            .expect("yml labels config should save");
+        let loaded = LabelsConfig::load_from_path(&config_path)
+            .expect("yml labels config should load after saving");
+
+        assert_eq!(loaded, config);
     }
 }

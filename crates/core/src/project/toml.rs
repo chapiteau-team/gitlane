@@ -1,10 +1,8 @@
 use std::path::Path;
 
 use crate::{
-    config::{
-        ConfigKind, default_config_path, load_config_from_path, parse_config, save_toml_config,
-        to_toml_string,
-    },
+    codec::{load_config_from_path, parse_config, save_toml_config, to_toml_string},
+    config::{ConfigKind, default_config_path},
     errors::GitlaneError,
 };
 

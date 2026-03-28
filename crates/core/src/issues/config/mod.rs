@@ -1,11 +1,9 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    path::Path,
-};
+use std::collections::{BTreeMap, HashSet};
 
 use crate::{
-    config::{impl_config, validate_id, validate_non_blank},
-    errors::{ConfigValidationError, GitlaneError},
+    config::impl_config,
+    errors::ConfigValidationError,
+    validate::{validate_id, validate_non_blank},
 };
 
 mod codec;
@@ -21,6 +19,8 @@ pub struct IssuesConfig {
     priorities: BTreeMap<PriorityId, IssuePriority>,
     priority_order: Vec<PriorityId>,
 }
+
+impl_config!(IssuesConfig);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssuePriority {
@@ -45,10 +45,6 @@ impl IssuesConfig {
         })
     }
 
-    pub fn save_to_path(&self, config_path: &Path) -> Result<(), GitlaneError> {
-        toml::save_to_path(config_path, self)
-    }
-
     pub fn issue_prefix(&self) -> &str {
         &self.issue_prefix
     }
@@ -61,8 +57,6 @@ impl IssuesConfig {
         &self.priority_order
     }
 }
-
-impl_config!(IssuesConfig);
 
 impl IssuePriority {
     pub fn new(name: String, description: Option<String>) -> Result<Self, ConfigValidationError> {
@@ -163,8 +157,9 @@ fn validate_priority_order(
 mod tests {
     use super::*;
 
-    use std::fs;
+    use std::{fs, path::Path};
 
+    use crate::errors::GitlaneError;
     use tempfile::TempDir;
 
     fn priority(name: &str, description: Option<&str>) -> IssuePriority {
@@ -359,6 +354,32 @@ p1 = { name = "Urgent" }
     }
 
     #[test]
+    fn saves_and_loads_yaml_issues_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("issues.yaml");
+        let config = IssuesConfig::new(
+            "ISS".to_owned(),
+            BTreeMap::from([
+                ("p0".to_owned(), priority("No Priority", None)),
+                (
+                    "p1".to_owned(),
+                    priority("Urgent", Some("Needs immediate attention")),
+                ),
+            ]),
+            vec!["p1".to_owned(), "p0".to_owned()],
+        )
+        .expect("issues config should be valid");
+
+        config
+            .save_to_path(&config_path)
+            .expect("yaml issues config should save");
+        let loaded = IssuesConfig::load_from_path(&config_path)
+            .expect("yaml issues config should load after saving");
+
+        assert_eq!(loaded, config);
+    }
+
+    #[test]
     fn loads_yml_issues_config() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let config_path = temp_dir.path().join("issues.yml");
@@ -379,5 +400,25 @@ p1 = { name = "Urgent" }
             IssuesConfig::load_from_path(&config_path).expect("yml issues config should load");
 
         assert_eq!(config.issue_prefix(), "ISS");
+    }
+
+    #[test]
+    fn saves_and_loads_yml_issues_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("issues.yml");
+        let config = IssuesConfig::new(
+            "ISS".to_owned(),
+            BTreeMap::from([("p1".to_owned(), priority("Urgent", None))]),
+            vec!["p1".to_owned()],
+        )
+        .expect("issues config should be valid");
+
+        config
+            .save_to_path(&config_path)
+            .expect("yml issues config should save");
+        let loaded = IssuesConfig::load_from_path(&config_path)
+            .expect("yml issues config should load after saving");
+
+        assert_eq!(loaded, config);
     }
 }

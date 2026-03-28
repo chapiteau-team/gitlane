@@ -55,7 +55,7 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    use crate::config::{ConfigKind, default_config_path};
+    use crate::config::{ConfigFileExtension, ConfigKind, default_config_path};
 
     fn create_project_dir(project_dir: &Path, config: &str) -> PathBuf {
         fs::create_dir_all(project_dir).expect("project directory should be created");
@@ -114,7 +114,7 @@ name = ""
 
         let err = Gitlane::init(
             project_dir.clone(),
-            InitOptions::new("ignored".to_owned(), None, None)
+            InitOptions::new("ignored".to_owned(), None, None, ConfigFileExtension::Toml)
                 .expect("init options should be valid"),
         )
         .expect_err("invalid existing project config should fail");

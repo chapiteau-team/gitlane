@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::{
-    config::{load_config_from_path, parse_config},
+    codec::{load_config_from_path, parse_config, save_yaml_config},
     errors::GitlaneError,
 };
 
@@ -15,4 +15,8 @@ pub fn parse_str(content: &str, workflow_path: &Path) -> Result<WorkflowConfig, 
     parse_config(content, workflow_path, |content| {
         serde_yaml::from_str::<WorkflowConfigRepr>(content)
     })
+}
+
+pub fn save_to_path(workflow_path: &Path, config: &WorkflowConfig) -> Result<(), GitlaneError> {
+    save_yaml_config(workflow_path, &WorkflowConfigRepr::from(config))
 }

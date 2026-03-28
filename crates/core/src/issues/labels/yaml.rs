@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::{
-    config::{load_config_from_path, parse_config},
+    codec::{load_config_from_path, parse_config, save_yaml_config},
     errors::GitlaneError,
 };
 
@@ -15,4 +15,8 @@ pub fn parse_str(content: &str, config_path: &Path) -> Result<LabelsConfig, Gitl
     parse_config(content, config_path, |content| {
         serde_yaml::from_str::<LabelsConfigRepr>(content)
     })
+}
+
+pub fn save_to_path(config_path: &Path, config: &LabelsConfig) -> Result<(), GitlaneError> {
+    save_yaml_config(config_path, &LabelsConfigRepr::from(config))
 }

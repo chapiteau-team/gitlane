@@ -6,9 +6,9 @@ use std::path::Path;
 
 use anyhow::{anyhow, bail};
 use clap::Parser;
-use gitlane::{Gitlane, InitOptions, paths::GITLANE_DIR};
+use gitlane::{Gitlane, InitOptions, config::ConfigFileExtension, paths::GITLANE_DIR};
 
-use crate::cli::Command;
+use crate::cli::{Command, InitFormatArg};
 
 fn main() -> anyhow::Result<()> {
     let cli = cli::Cli::parse();
@@ -19,7 +19,8 @@ fn main() -> anyhow::Result<()> {
             let name = args
                 .name
                 .map_or_else(|| infer_project_name(&project_root), Ok)?;
-            let options = InitOptions::new(name, args.description, args.homepage)?;
+            let format = args.format.map_or(ConfigFileExtension::Toml, Into::into);
+            let options = InitOptions::new(name, args.description, args.homepage, format)?;
             let project_path = project_root.join(GITLANE_DIR);
 
             let _service = Gitlane::init(project_path, options)?;
@@ -29,6 +30,16 @@ fn main() -> anyhow::Result<()> {
             let project_path = path::resolve_project(&project_root)?;
             let _service = Gitlane::load(project_path)?;
             bail!("command not implemented")
+        }
+    }
+}
+
+impl From<InitFormatArg> for ConfigFileExtension {
+    fn from(format: InitFormatArg) -> Self {
+        match format {
+            InitFormatArg::Toml => Self::Toml,
+            InitFormatArg::Yaml => Self::Yaml,
+            InitFormatArg::Yml => Self::Yml,
         }
     }
 }

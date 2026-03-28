@@ -1,12 +1,9 @@
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, path::Path};
 
 use crate::{
-    config::{ConfigKind, config_candidate_paths, impl_config, validate_non_blank},
+    config::{ConfigKind, discover_config_path, impl_config},
     errors::{ConfigValidationError, GitlaneError},
-    fs::ensure_file,
+    validate::validate_non_blank,
 };
 
 mod codec;
@@ -21,6 +18,8 @@ pub struct ProjectConfig {
     homepage: Option<String>,
     people: Vec<String>,
 }
+
+impl_config!(ProjectConfig);
 
 impl ProjectConfig {
     /// Build validated project metadata.
@@ -59,7 +58,7 @@ impl ProjectConfig {
 
     /// Load and validate project configuration from the supported config file.
     pub fn load(project_dir: &Path) -> Result<Self, GitlaneError> {
-        match discover_config_path(project_dir)? {
+        match discover_config_path(project_dir, ConfigKind::Project)? {
             Some(config_path) => Self::load_from_path(&config_path),
             None => toml::load(project_dir),
         }
@@ -83,28 +82,6 @@ impl ProjectConfig {
     /// Return the ordered list of unique person handles.
     pub fn people(&self) -> &[String] {
         &self.people
-    }
-}
-
-impl_config!(ProjectConfig);
-
-fn discover_config_path(project_dir: &Path) -> Result<Option<PathBuf>, GitlaneError> {
-    let mut matches = Vec::new();
-
-    for candidate in config_candidate_paths(project_dir, ConfigKind::Project) {
-        if candidate.exists() {
-            ensure_file(&candidate)?;
-            matches.push(candidate);
-        }
-    }
-
-    match matches.len() {
-        0 => Ok(None),
-        1 => Ok(matches.pop()),
-        _ => Err(GitlaneError::AmbiguousConfigFiles {
-            config_name: "project",
-            paths: matches,
-        }),
     }
 }
 
@@ -236,7 +213,9 @@ people = ["@alice", "@bob", "@carol"]
         )
         .expect("project config should be valid");
 
-        toml::save_to_path(&config_path, &config).expect("project config should save");
+        config
+            .save_to_path(&config_path)
+            .expect("project config should save");
         let loaded = toml::load_from_path(&config_path).expect("project config should load");
 
         assert_eq!(loaded, config);
@@ -301,6 +280,49 @@ people = ["@alice", "@bob", "@carol"]
         let config = ProjectConfig::load(temp_dir.path()).expect("yml project config should load");
 
         assert_eq!(config.name(), "Gitlane");
+    }
+
+    #[test]
+    fn saves_and_loads_yaml_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = config_path(
+            temp_dir.path(),
+            ConfigKind::Project,
+            ConfigFileExtension::Yaml,
+        );
+        let config = ProjectConfig::new(
+            "Gitlane".to_owned(),
+            Some("Git-native task tracker".to_owned()),
+            Some("https://example.com".to_owned()),
+            vec!["@alice".to_owned()],
+        )
+        .expect("project config should be valid");
+
+        config
+            .save_to_path(&config_path)
+            .expect("yaml project config should save");
+        let loaded = yaml::load_from_path(&config_path).expect("yaml project config should load");
+
+        assert_eq!(loaded, config);
+    }
+
+    #[test]
+    fn saves_and_loads_yml_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = config_path(
+            temp_dir.path(),
+            ConfigKind::Project,
+            ConfigFileExtension::Yml,
+        );
+        let config = ProjectConfig::new("Gitlane".to_owned(), None, None, Vec::new())
+            .expect("project config should be valid");
+
+        config
+            .save_to_path(&config_path)
+            .expect("yml project config should save");
+        let loaded = yaml::load_from_path(&config_path).expect("yml project config should load");
+
+        assert_eq!(loaded, config);
     }
 
     #[test]

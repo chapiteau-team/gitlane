@@ -1,3 +1,4 @@
+mod codec;
 pub mod config;
 pub mod errors;
 mod fs;
@@ -5,6 +6,7 @@ mod gitlane;
 pub mod init;
 pub mod issues;
 pub mod project;
+mod validate;
 
 pub mod paths;
 

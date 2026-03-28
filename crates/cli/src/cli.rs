@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -45,6 +45,16 @@ pub struct InitArgs {
 
     #[arg(long)]
     pub homepage: Option<String>,
+
+    #[arg(long, value_enum)]
+    pub format: Option<InitFormatArg>,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum InitFormatArg {
+    Toml,
+    Yaml,
+    Yml,
 }
 
 #[derive(Debug, Subcommand)]

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::{
-    config::{load_config_from_path, parse_config, save_toml_config, to_toml_string},
+    codec::{load_config_from_path, parse_config, save_toml_config, to_toml_string},
     errors::GitlaneError,
 };
 

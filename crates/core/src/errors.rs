@@ -18,11 +18,11 @@ pub enum GitlaneError {
         #[source]
         source: ConfigParseError,
     },
-    #[error("failed to serialize TOML for `{path}`")]
-    SerializeToml {
+    #[error("failed to serialize `{path}` as {format}", format = .source.format_name())]
+    SerializeConfig {
         path: PathBuf,
         #[source]
-        source: toml::ser::Error,
+        source: ConfigSerializeError,
     },
     #[error("unsupported config format for `{path}`; expected .toml, .yaml, or .yml")]
     UnsupportedConfigFormat { path: PathBuf },
@@ -49,6 +49,13 @@ impl GitlaneError {
             source: source.into(),
         }
     }
+
+    pub fn serialize_config(path: &Path, source: impl Into<ConfigSerializeError>) -> Self {
+        Self::SerializeConfig {
+            path: path.to_path_buf(),
+            source: source.into(),
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -60,6 +67,23 @@ pub enum ConfigParseError {
 }
 
 impl ConfigParseError {
+    fn format_name(&self) -> &'static str {
+        match self {
+            Self::Toml(_) => "TOML",
+            Self::Yaml(_) => "YAML",
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ConfigSerializeError {
+    #[error(transparent)]
+    Toml(#[from] toml::ser::Error),
+    #[error(transparent)]
+    Yaml(#[from] serde_yaml::Error),
+}
+
+impl ConfigSerializeError {
     fn format_name(&self) -> &'static str {
         match self {
             Self::Toml(_) => "TOML",

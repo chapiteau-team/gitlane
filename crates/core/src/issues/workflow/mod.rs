@@ -1,8 +1,9 @@
-use std::{collections::BTreeMap, path::Path};
+use std::collections::BTreeMap;
 
 use crate::{
-    config::{impl_config, validate_id, validate_non_blank},
-    errors::{ConfigValidationError, GitlaneError},
+    config::impl_config,
+    errors::ConfigValidationError,
+    validate::{validate_id, validate_non_blank},
 };
 
 mod codec;
@@ -31,6 +32,8 @@ pub struct WorkflowTransition {
     to: StateId,
 }
 
+impl_config!(WorkflowConfig);
+
 impl WorkflowConfig {
     pub fn new(
         initial_state: StateId,
@@ -46,10 +49,6 @@ impl WorkflowConfig {
             states,
             transitions,
         })
-    }
-
-    pub fn save_to_path(&self, workflow_path: &Path) -> Result<(), GitlaneError> {
-        toml::save_to_path(workflow_path, self)
     }
 
     pub fn initial_state(&self) -> &str {
@@ -68,8 +67,6 @@ impl WorkflowConfig {
         &self.transitions
     }
 }
-
-impl_config!(WorkflowConfig);
 
 impl WorkflowState {
     pub fn new(name: String) -> Result<Self, ConfigValidationError> {
@@ -196,8 +193,9 @@ fn validate_transitions(
 mod tests {
     use super::*;
 
-    use std::fs;
+    use std::{fs, path::Path};
 
+    use crate::errors::GitlaneError;
     use tempfile::TempDir;
 
     fn state(name: &str) -> WorkflowState {
@@ -582,6 +580,32 @@ finish = { name = "Finish", to = "review" }
     }
 
     #[test]
+    fn saves_and_loads_yaml_workflow() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let workflow_path = temp_dir.path().join("workflow.yaml");
+        let workflow = WorkflowConfig::new(
+            "todo".to_owned(),
+            BTreeMap::from([
+                ("done".to_owned(), state("Done")),
+                ("todo".to_owned(), state("To Do")),
+            ]),
+            BTreeMap::from([(
+                "todo".to_owned(),
+                BTreeMap::from([("finish".to_owned(), transition("Finish", "done"))]),
+            )]),
+        )
+        .expect("workflow should be valid");
+
+        workflow
+            .save_to_path(&workflow_path)
+            .expect("yaml workflow should save");
+        let loaded = WorkflowConfig::load_from_path(&workflow_path)
+            .expect("yaml workflow should load after saving");
+
+        assert_eq!(loaded, workflow);
+    }
+
+    #[test]
     fn loads_yml_workflow() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let workflow_path = temp_dir.path().join("workflow.yml");
@@ -600,5 +624,25 @@ finish = { name = "Finish", to = "review" }
             WorkflowConfig::load_from_path(&workflow_path).expect("yml workflow should load");
 
         assert_eq!(workflow.state_ids().collect::<Vec<_>>(), ["todo"]);
+    }
+
+    #[test]
+    fn saves_and_loads_yml_workflow() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let workflow_path = temp_dir.path().join("workflow.yml");
+        let workflow = WorkflowConfig::new(
+            "todo".to_owned(),
+            BTreeMap::from([("todo".to_owned(), state("To Do"))]),
+            BTreeMap::new(),
+        )
+        .expect("workflow should be valid");
+
+        workflow
+            .save_to_path(&workflow_path)
+            .expect("yml workflow should save");
+        let loaded = WorkflowConfig::load_from_path(&workflow_path)
+            .expect("yml workflow should load after saving");
+
+        assert_eq!(loaded, workflow);
     }
 }
