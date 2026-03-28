@@ -462,6 +462,43 @@ mod tests {
     }
 
     #[test]
+    fn initialize_creates_json_project_layout_when_requested() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let project_path = temp_dir.path();
+
+        initialize(
+            project_path,
+            InitOptions::new("demo".to_owned(), None, None, ConfigFileExtension::Json)
+                .expect("init options should be valid"),
+        )
+        .expect("init should succeed");
+
+        assert!(
+            config_path(project_path, ConfigKind::Project, ConfigFileExtension::Json).is_file()
+        );
+        assert!(
+            config_path(
+                project_path,
+                ConfigKind::IssuesWorkflow,
+                ConfigFileExtension::Json
+            )
+            .is_file()
+        );
+        assert!(config_path(project_path, ConfigKind::Issues, ConfigFileExtension::Json).is_file());
+        assert!(
+            config_path(
+                project_path,
+                ConfigKind::IssuesLabels,
+                ConfigFileExtension::Json
+            )
+            .is_file()
+        );
+        assert!(
+            !config_path(project_path, ConfigKind::Project, ConfigFileExtension::Toml).exists()
+        );
+    }
+
+    #[test]
     fn initialize_uses_existing_yaml_workflow_in_partial_scaffold() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_path = temp_dir.path();

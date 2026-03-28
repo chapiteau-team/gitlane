@@ -665,4 +665,24 @@ finish = { name = "Finish", to = "review" }
 
         assert_eq!(loaded, workflow);
     }
+
+    #[test]
+    fn saves_and_loads_json_workflow() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let workflow_path = temp_dir.path().join("workflow.json");
+        let workflow = WorkflowConfig::new(
+            "todo".to_owned(),
+            BTreeMap::from([("todo".to_owned(), state("To Do"))]),
+            BTreeMap::new(),
+        )
+        .expect("workflow should be valid");
+
+        workflow
+            .save(&workflow_path)
+            .expect("json workflow should save");
+        let loaded =
+            WorkflowConfig::load(&workflow_path).expect("json workflow should load after saving");
+
+        assert_eq!(loaded, workflow);
+    }
 }

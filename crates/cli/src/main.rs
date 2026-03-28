@@ -38,6 +38,7 @@ impl From<InitFormatArg> for ConfigFileExtension {
     fn from(format: InitFormatArg) -> Self {
         match format {
             InitFormatArg::Toml => Self::Toml,
+            InitFormatArg::Json => Self::Json,
             InitFormatArg::Yaml => Self::Yaml,
             InitFormatArg::Yml => Self::Yml,
         }

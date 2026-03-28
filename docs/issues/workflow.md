@@ -4,6 +4,7 @@ Gitlane workflow is fully declarative and not hardcoded.
 It is defined at the repository level in exactly one of:
 
 - `.gitlane/issues/workflow.toml`
+- `.gitlane/issues/workflow.json`
 - `.gitlane/issues/workflow.yaml`
 - `.gitlane/issues/workflow.yml`
 
@@ -20,7 +21,7 @@ If more than one supported workflow config file is present at the same time, Git
 workflow config is ambiguous.
 
 `gitlane init --format <FORMAT>` chooses which workflow config file is created when one is missing. Supported values
-are `toml`, `yaml`, and `yml`. If `--format` is omitted, `gitlane init` defaults to `toml`.
+are `toml`, `json`, `yaml`, and `yml`. If `--format` is omitted, `gitlane init` defaults to `toml`.
 
 Required top-level fields:
 
@@ -125,7 +126,7 @@ The directory move is the state change.
 Workflow does not define issue metadata.
 
 - Project metadata is documented in [`project.md`](../project.md).
-- Issue config lives in exactly one of `.gitlane/issues/issues.toml`, `.gitlane/issues/issues.yaml`, or `.gitlane/issues/issues.yml`.
-- Label config lives in exactly one of `.gitlane/issues/labels.toml`, `.gitlane/issues/labels.yaml`, or `.gitlane/issues/labels.yml`.
+- Issue config lives in exactly one of `.gitlane/issues/issues.toml`, `.gitlane/issues/issues.json`, `.gitlane/issues/issues.yaml`, or `.gitlane/issues/issues.yml`.
+- Label config lives in exactly one of `.gitlane/issues/labels.toml`, `.gitlane/issues/labels.json`, `.gitlane/issues/labels.yaml`, or `.gitlane/issues/labels.yml`.
 
 See [`issues.md`](issues.md) and [`labels.md`](labels.md) for issue metadata schemas.

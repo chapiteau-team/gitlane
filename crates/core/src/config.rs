@@ -39,6 +39,7 @@ impl ConfigKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigFileExtension {
     Toml,
+    Json,
     Yaml,
     Yml,
 }
@@ -48,20 +49,22 @@ impl ConfigFileExtension {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Toml => "toml",
+            Self::Json => "json",
             Self::Yaml => "yaml",
             Self::Yml => "yml",
         }
     }
 
     /// Returns all supported config file extensions.
-    pub const fn all() -> [Self; 3] {
-        [Self::Toml, Self::Yaml, Self::Yml]
+    pub const fn all() -> [Self; 4] {
+        [Self::Toml, Self::Json, Self::Yaml, Self::Yml]
     }
 
     /// Infers the config file extension from a path.
     pub fn from_path(path: &Path) -> Result<Self, GitlaneError> {
         match path.extension().and_then(|extension| extension.to_str()) {
             Some("toml") => Ok(Self::Toml),
+            Some("json") => Ok(Self::Json),
             Some("yaml") => Ok(Self::Yaml),
             Some("yml") => Ok(Self::Yml),
             _ => Err(GitlaneError::UnsupportedConfigFormat {
@@ -87,7 +90,7 @@ pub fn config_file_name(kind: ConfigKind, extension: ConfigFileExtension) -> Str
 }
 
 /// Returns all supported filenames for a config kind.
-pub fn config_file_names(kind: ConfigKind) -> [String; 3] {
+pub fn config_file_names(kind: ConfigKind) -> [String; 4] {
     ConfigFileExtension::all().map(|extension| config_file_name(kind, extension))
 }
 
@@ -101,7 +104,7 @@ pub fn config_path(
 }
 
 /// Returns candidate paths for all supported extensions.
-pub fn config_candidate_paths(project_dir: &Path, kind: ConfigKind) -> [PathBuf; 3] {
+pub fn config_candidate_paths(project_dir: &Path, kind: ConfigKind) -> [PathBuf; 4] {
     ConfigFileExtension::all().map(|extension| config_path(project_dir, kind, extension))
 }
 

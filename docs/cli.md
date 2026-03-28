@@ -11,12 +11,14 @@ gitlane [OPTIONS] <COMMAND>
 Global options:
 
 - `--project <PATH>`:
-    - For `init`: target project root where `.gitlane` is created. If `.gitlane/project.toml`, `.gitlane/project.yaml`,
-      or `.gitlane/project.yml` already exists, `init` returns an error. If omitted, uses current directory.
+    - For `init`: target project root where `.gitlane` is created. If `.gitlane/project.toml`, `.gitlane/project.json`,
+      `.gitlane/project.yaml`, or `.gitlane/project.yml` already exists, `init` returns an error. If omitted, uses
+      current directory.
     - For other commands: path used as the starting point for `.gitlane` discovery. If omitted, starts from current
       directory. Discovery walks up parent directories (same style as `.git` discovery) and accepts either a
       `.gitlane` directory directly or a directory containing `.gitlane`. The resolved `.gitlane` directory must
-      contain exactly one supported project config file: `project.toml`, `project.yaml`, or `project.yml`.
+      contain exactly one supported project config file: `project.toml`, `project.json`, `project.yaml`, or
+      `project.yml`.
       Project config schema is documented in [`docs/project.md`](project.md).
 
 ## Supported Commands
@@ -58,8 +60,8 @@ Commands other than `init` are currently scaffolded.
     - `--name <NAME>`: set project name in the project config file created by `init`.
     - `--description <TEXT>`: set project description in the project config file created by `init`.
     - `--homepage <URL>`: set project homepage in the project config file created by `init`.
-    - `--format <FORMAT>`: choose config file format for files created by `init`. Supported values: `toml`, `yaml`,
-      `yml`. Default: `toml`.
+    - `--format <FORMAT>`: choose config file format for files created by `init`. Supported values: `toml`, `json`,
+      `yaml`, `yml`. Default: `toml`.
 
 ### Behavior
 
@@ -149,13 +151,14 @@ needs_decision = { name = "Needs Decision", description = "Requires product or t
 good_first_issue = { name = "Good First Issue", description = "Suitable for new contributors", color = "#0369a1" }
 ```
 
-When `--format yaml` or `--format yml` is used, Gitlane writes the same logical config data as YAML into `.yaml` or
-`.yml` files.
+When `--format json`, `--format yaml`, or `--format yml` is used, Gitlane writes the same logical config data as JSON
+or YAML into `.json`, `.yaml`, or `.yml` files.
 
 ### Examples
 
 ```bash
 gitlane init
+gitlane init --format json
 gitlane init --format yaml
 gitlane --project ../my-repo init --name "My Repo"
 gitlane init --description "Git-native tracker" --homepage "https://example.com"

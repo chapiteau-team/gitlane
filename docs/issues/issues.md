@@ -11,6 +11,7 @@ Issue configuration is separate from workflow movement rules and labels.
 Issue configuration may live in exactly one of:
 
 - `.gitlane/issues/issues.toml`
+- `.gitlane/issues/issues.json`
 - `.gitlane/issues/issues.yaml`
 - `.gitlane/issues/issues.yml`
 
@@ -18,7 +19,7 @@ If more than one supported issue config file is present at the same time, Gitlan
 config is ambiguous.
 
 `gitlane init --format <FORMAT>` chooses which issue config file is created when one is missing. Supported values are
-`toml`, `yaml`, and `yml`. If `--format` is omitted, `gitlane init` defaults to `toml`.
+`toml`, `json`, `yaml`, and `yml`. If `--format` is omitted, `gitlane init` defaults to `toml`.
 
 ### Required top-level fields
 
@@ -113,7 +114,7 @@ Format:
 
 Where:
 
-- `<prefix>` is `issue_prefix` from the issue config file in `.gitlane/issues/issues.toml`, `.gitlane/issues/issues.yaml`, or `.gitlane/issues/issues.yml`.
+- `<prefix>` is `issue_prefix` from the issue config file in `.gitlane/issues/issues.toml`, `.gitlane/issues/issues.json`, `.gitlane/issues/issues.yaml`, or `.gitlane/issues/issues.yml`.
 - `unix_ms` is current UTC time in milliseconds.
 - `base36(unix_ms)` is lowercase base36 encoding of `unix_ms`.
 

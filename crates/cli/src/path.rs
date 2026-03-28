@@ -204,6 +204,16 @@ mod tests {
     }
 
     #[test]
+    fn resolves_project_when_project_json_exists() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let gitlane_dir = create_project_with_config(temp_dir.path(), ConfigFileExtension::Json);
+
+        let resolved = resolve_project(temp_dir.path()).expect("project should resolve");
+
+        assert_eq!(resolved, gitlane_dir);
+    }
+
+    #[test]
     fn errors_when_supported_project_config_is_missing() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_dir = temp_dir.path();
@@ -215,6 +225,7 @@ mod tests {
 
         assert!(err_text.contains("missing"));
         assert!(err_text.contains("project.toml"));
+        assert!(err_text.contains("project.json"));
         assert!(err_text.contains("project.yaml"));
         assert!(err_text.contains("project.yml"));
     }

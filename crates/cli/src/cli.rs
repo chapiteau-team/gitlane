@@ -53,6 +53,7 @@ pub struct InitArgs {
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum InitFormatArg {
     Toml,
+    Json,
     Yaml,
     Yml,
 }

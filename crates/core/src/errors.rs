@@ -25,7 +25,7 @@ pub enum GitlaneError {
         #[source]
         source: ConfigSerializeError,
     },
-    #[error("unsupported config format for `{path}`; expected .toml, .yaml, or .yml")]
+    #[error("unsupported config format for `{path}`; expected .toml, .json, .yaml, or .yml")]
     UnsupportedConfigFormat { path: PathBuf },
     #[error("missing supported {config_name} config file in `{directory}`")]
     MissingConfigFile {
@@ -73,6 +73,8 @@ pub enum ConfigParseError {
     #[error(transparent)]
     Toml(#[from] toml::de::Error),
     #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
     Yaml(#[from] serde_yaml::Error),
 }
 
@@ -80,6 +82,7 @@ impl ConfigParseError {
     fn format_name(&self) -> &'static str {
         match self {
             Self::Toml(_) => "TOML",
+            Self::Json(_) => "JSON",
             Self::Yaml(_) => "YAML",
         }
     }
@@ -91,6 +94,8 @@ pub enum ConfigSerializeError {
     #[error(transparent)]
     Toml(#[from] toml::ser::Error),
     #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
     Yaml(#[from] serde_yaml::Error),
 }
 
@@ -98,6 +103,7 @@ impl ConfigSerializeError {
     fn format_name(&self) -> &'static str {
         match self {
             Self::Toml(_) => "TOML",
+            Self::Json(_) => "JSON",
             Self::Yaml(_) => "YAML",
         }
     }

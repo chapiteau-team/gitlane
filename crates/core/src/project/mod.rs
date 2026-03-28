@@ -308,6 +308,45 @@ people = ["@alice", "@bob", "@carol"]
     }
 
     #[test]
+    fn loads_json_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        fs::write(
+            config_path(
+                temp_dir.path(),
+                ConfigKind::Project,
+                ConfigFileExtension::Json,
+            ),
+            concat!(
+                "{\n",
+                "  \"name\": \"Gitlane\",\n",
+                "  \"description\": \"Git-native task tracker\",\n",
+                "  \"homepage\": \"https://github.com/example/gitlane\",\n",
+                "  \"people\": [\"@alice\", \"@bob\"]\n",
+                "}\n"
+            ),
+        )
+        .expect("json project config should be written");
+
+        let config = ProjectConfig::load(&config_path(
+            temp_dir.path(),
+            ConfigKind::Project,
+            ConfigFileExtension::Json,
+        ))
+        .expect("json project config should load");
+
+        assert_eq!(config.name(), "Gitlane");
+        assert_eq!(config.description(), Some("Git-native task tracker"));
+        assert_eq!(
+            config.homepage(),
+            Some("https://github.com/example/gitlane")
+        );
+        assert_eq!(
+            config.people(),
+            &["@alice".to_string(), "@bob".to_string(),]
+        );
+    }
+
+    #[test]
     fn saves_and_loads_yaml_config() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let config_path = config_path(
@@ -348,6 +387,35 @@ people = ["@alice", "@bob", "@carol"]
         let loaded = ProjectConfig::load(&config_path).expect("yml project config should load");
 
         assert_eq!(loaded, config);
+    }
+
+    #[test]
+    fn saves_and_loads_json_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = config_path(
+            temp_dir.path(),
+            ConfigKind::Project,
+            ConfigFileExtension::Json,
+        );
+        let config = ProjectConfig::new(
+            "Gitlane".to_owned(),
+            Some("Git-native task tracker".to_owned()),
+            Some("https://example.com".to_owned()),
+            vec!["@alice".to_owned()],
+        )
+        .expect("project config should be valid");
+
+        config
+            .save(&config_path)
+            .expect("json project config should save");
+        let loaded = ProjectConfig::load(&config_path).expect("json project config should load");
+
+        assert_eq!(loaded, config);
+        assert!(
+            fs::read_to_string(config_path)
+                .expect("project config should be readable")
+                .contains("\"name\": \"Gitlane\"")
+        );
     }
 
     #[test]
@@ -400,6 +468,23 @@ people = ["@alice", "@bob", "@carol"]
             err,
             GitlaneError::ParseConfig {
                 source: ConfigParseError::Yaml(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn reports_json_parse_errors_with_unified_variant() {
+        let err = codec::parse::<ProjectConfig, super::repr::ProjectConfigRepr>(
+            "{",
+            Path::new("project.json"),
+        )
+        .expect_err("invalid JSON should fail");
+
+        assert!(matches!(
+            err,
+            GitlaneError::ParseConfig {
+                source: ConfigParseError::Json(_),
                 ..
             }
         ));

@@ -25,6 +25,8 @@ where
     let repr: Repr = match ConfigFileExtension::from_path(config_path)? {
         ConfigFileExtension::Toml => toml::from_str(content)
             .map_err(|source| GitlaneError::parse_config(config_path, source))?,
+        ConfigFileExtension::Json => serde_json::from_str(content)
+            .map_err(|source| GitlaneError::parse_config(config_path, source))?,
         ConfigFileExtension::Yaml | ConfigFileExtension::Yml => serde_yaml::from_str(content)
             .map_err(|source| GitlaneError::parse_config(config_path, source))?,
     };
@@ -40,6 +42,8 @@ where
     let repr = Repr::from(value);
     let content = match ConfigFileExtension::from_path(config_path)? {
         ConfigFileExtension::Toml => toml::to_string(&repr)
+            .map_err(|source| GitlaneError::serialize_config(config_path, source))?,
+        ConfigFileExtension::Json => serde_json::to_string_pretty(&repr)
             .map_err(|source| GitlaneError::serialize_config(config_path, source))?,
         ConfigFileExtension::Yaml | ConfigFileExtension::Yml => serde_yaml::to_string(&repr)
             .map_err(|source| GitlaneError::serialize_config(config_path, source))?,

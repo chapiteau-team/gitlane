@@ -130,14 +130,14 @@ If one cannot be run locally, explicitly note that in your handoff.
 ### Domain Docs (Read First)
 - Treat `docs/` as the canonical source for product behavior and data-model semantics.
 - Current `init` behavior is create-only: it may complete a partial `.gitlane/` scaffold when no supported project
-  config file exists (`.gitlane/project.toml`, `.gitlane/project.yaml`, or `.gitlane/project.yml`), but it must fail
-  once one already exists.
-- `init` accepts `--format toml|yaml|yml` for config files it creates and defaults to `toml`.
+  config file exists (`.gitlane/project.toml`, `.gitlane/project.json`, `.gitlane/project.yaml`, or
+  `.gitlane/project.yml`), but it must fail once one already exists.
+- `init` accepts `--format toml|json|yaml|yml` for config files it creates and defaults to `toml`.
 - If more than one supported config file exists for the same logical config (`project`, `workflow`, `issues`, or
   `labels`), treat that as an error rather than guessing.
 - Before changing CLI behavior or config/data validation, read the relevant doc first:
   - `docs/cli.md` (command surface and expected behavior)
-  - `docs/project.md` (`.gitlane/project.{toml,yaml,yml}` schema)
+  - `docs/project.md` (`.gitlane/project.{toml,json,yaml,yml}` schema)
   - `docs/issues/workflow.md` (state graph and transition rules)
   - `docs/issues/issues.md` (issue IDs, front matter, and filesystem layout)
   - `docs/issues/labels.md` (label/group schema and constraints)

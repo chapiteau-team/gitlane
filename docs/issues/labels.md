@@ -7,6 +7,7 @@ Labels are configured separately from workflow movement rules and from issue con
 Label configuration may live in exactly one of:
 
 - `.gitlane/issues/labels.toml`
+- `.gitlane/issues/labels.json`
 - `.gitlane/issues/labels.yaml`
 - `.gitlane/issues/labels.yml`
 
@@ -14,7 +15,7 @@ If more than one supported labels config file is present at the same time, Gitla
 config is ambiguous.
 
 `gitlane init --format <FORMAT>` chooses which labels config file is created when one is missing. Supported values are
-`toml`, `yaml`, and `yml`. If `--format` is omitted, `gitlane init` defaults to `toml`.
+`toml`, `json`, `yaml`, and `yml`. If `--format` is omitted, `gitlane init` defaults to `toml`.
 
 ## Required top-level fields
 
@@ -89,5 +90,6 @@ good_first_issue = { name = "Good First Issue", description = "Suitable for new 
 In this example, all `type_*` labels are mutually exclusive because they are in the same `type` group, and they all
 inherit color `#334155` from that group.
 
-When `gitlane init --format yaml` or `gitlane init --format yml` is used, Gitlane writes the same logical label data as
-YAML into `.gitlane/issues/labels.yaml` or `.gitlane/issues/labels.yml`.
+When `gitlane init --format json`, `gitlane init --format yaml`, or `gitlane init --format yml` is used, Gitlane
+writes the same logical label data as JSON or YAML into `.gitlane/issues/labels.json`, `.gitlane/issues/labels.yaml`,
+or `.gitlane/issues/labels.yml`.

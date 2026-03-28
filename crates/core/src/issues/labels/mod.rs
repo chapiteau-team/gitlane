@@ -435,4 +435,26 @@ type_bug = { name = "   " }
 
         assert_eq!(loaded, config);
     }
+
+    #[test]
+    fn saves_and_loads_json_labels_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("labels.json");
+        let config = LabelsConfig::new(
+            BTreeMap::new(),
+            BTreeMap::from([(
+                "blocked".to_owned(),
+                label("Blocked", Some("#b91c1c"), None),
+            )]),
+        )
+        .expect("labels config should be valid");
+
+        config
+            .save(&config_path)
+            .expect("json labels config should save");
+        let loaded =
+            LabelsConfig::load(&config_path).expect("json labels config should load after saving");
+
+        assert_eq!(loaded, config);
+    }
 }

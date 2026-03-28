@@ -441,4 +441,24 @@ p1 = { name = "Urgent" }
 
         assert_eq!(loaded, config);
     }
+
+    #[test]
+    fn saves_and_loads_json_issues_config() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let config_path = temp_dir.path().join("issues.json");
+        let config = IssuesConfig::new(
+            "ISS".to_owned(),
+            BTreeMap::from([("p1".to_owned(), priority("Urgent", None))]),
+            vec!["p1".to_owned()],
+        )
+        .expect("issues config should be valid");
+
+        config
+            .save(&config_path)
+            .expect("json issues config should save");
+        let loaded =
+            IssuesConfig::load(&config_path).expect("json issues config should load after saving");
+
+        assert_eq!(loaded, config);
+    }
 }
