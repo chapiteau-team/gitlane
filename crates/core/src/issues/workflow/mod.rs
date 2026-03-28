@@ -1,19 +1,20 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::Path};
 
 use crate::{
-    config::impl_config,
-    errors::ConfigValidationError,
+    codec,
+    errors::{ConfigValidationError, GitlaneError},
     validate::{validate_id, validate_non_blank},
 };
 
-mod codec;
+mod repr;
 pub mod templates;
-pub mod toml;
-mod yaml;
 
+/// Stable identifier for a workflow state.
 pub type StateId = String;
+/// Stable identifier for a workflow transition.
 pub type TransitionId = String;
 
+/// Validated issue workflow configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkflowConfig {
     initial_state: StateId,
@@ -21,20 +22,21 @@ pub struct WorkflowConfig {
     transitions: BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>>,
 }
 
+/// Validated workflow state definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkflowState {
     name: String,
 }
 
+/// Validated workflow transition definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkflowTransition {
     name: String,
     to: StateId,
 }
 
-impl_config!(WorkflowConfig);
-
 impl WorkflowConfig {
+    /// Builds validated workflow configuration.
     pub fn new(
         initial_state: StateId,
         states: BTreeMap<StateId, WorkflowState>,
@@ -51,36 +53,53 @@ impl WorkflowConfig {
         })
     }
 
+    /// Loads this config from a supported file path.
+    pub fn load(workflow_path: &Path) -> Result<Self, GitlaneError> {
+        codec::load::<Self, repr::WorkflowConfigRepr>(workflow_path)
+    }
+
+    /// Saves this config using the format implied by `workflow_path`.
+    pub fn save(&self, workflow_path: &Path) -> Result<(), GitlaneError> {
+        codec::save::<Self, repr::WorkflowConfigRepr>(workflow_path, self)
+    }
+
+    /// Returns the initial state id.
     pub fn initial_state(&self) -> &str {
         &self.initial_state
     }
 
+    /// Returns state ids in key order.
     pub fn state_ids(&self) -> impl Iterator<Item = &str> {
         self.states.keys().map(String::as_str)
     }
 
+    /// Returns states keyed by state id.
     pub fn states(&self) -> &BTreeMap<StateId, WorkflowState> {
         &self.states
     }
 
+    /// Returns transitions keyed by source state id.
     pub fn transitions(&self) -> &BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>> {
         &self.transitions
     }
 }
 
 impl WorkflowState {
+    /// Builds a validated workflow state.
     pub fn new(name: String) -> Result<Self, ConfigValidationError> {
         validate_non_blank(&name, "workflow states must have a non-empty `name`")?;
 
         Ok(Self { name })
     }
 
+    /// Returns the display name.
     pub fn name(&self) -> &str {
         &self.name
     }
 }
 
 impl WorkflowTransition {
+    /// Builds a validated workflow transition.
     pub fn new(name: String, to: StateId) -> Result<Self, ConfigValidationError> {
         validate_non_blank(&name, "workflow transitions must have a non-empty `name`")?;
 
@@ -93,10 +112,12 @@ impl WorkflowTransition {
         Ok(Self { name, to })
     }
 
+    /// Returns the display name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the destination state id.
     pub fn to(&self) -> &str {
         &self.to
     }
@@ -195,7 +216,7 @@ mod tests {
 
     use std::{fs, path::Path};
 
-    use crate::errors::GitlaneError;
+    use crate::codec;
     use tempfile::TempDir;
 
     fn state(name: &str) -> WorkflowState {
@@ -208,14 +229,17 @@ mod tests {
     }
 
     fn parse_workflow_config(content: &str) -> Result<WorkflowConfig, GitlaneError> {
-        toml::parse_str(content, Path::new("workflow.toml"))
+        codec::parse::<WorkflowConfig, super::repr::WorkflowConfigRepr>(
+            content,
+            Path::new("workflow.toml"),
+        )
     }
 
     fn load_workflow_config(content: &str) -> Result<WorkflowConfig, GitlaneError> {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let workflow_path = temp_dir.path().join("workflow.toml");
         fs::write(&workflow_path, content).expect("workflow config should be written");
-        WorkflowConfig::load_from_path(&workflow_path)
+        WorkflowConfig::load(&workflow_path)
     }
 
     #[test]
@@ -542,11 +566,9 @@ finish = { name = "Finish", to = "review" }
         )
         .expect("workflow should be valid");
 
-        workflow
-            .save_to_path(&workflow_path)
-            .expect("workflow should save");
-        let loaded = WorkflowConfig::load_from_path(&workflow_path)
-            .expect("workflow should load after saving");
+        workflow.save(&workflow_path).expect("workflow should save");
+        let loaded =
+            WorkflowConfig::load(&workflow_path).expect("workflow should load after saving");
 
         assert_eq!(loaded, workflow);
     }
@@ -573,8 +595,7 @@ finish = { name = "Finish", to = "review" }
         )
         .expect("yaml workflow should be written");
 
-        let workflow =
-            WorkflowConfig::load_from_path(&workflow_path).expect("yaml workflow should load");
+        let workflow = WorkflowConfig::load(&workflow_path).expect("yaml workflow should load");
 
         assert_eq!(workflow.state_ids().collect::<Vec<_>>(), ["done", "todo"]);
     }
@@ -597,10 +618,10 @@ finish = { name = "Finish", to = "review" }
         .expect("workflow should be valid");
 
         workflow
-            .save_to_path(&workflow_path)
+            .save(&workflow_path)
             .expect("yaml workflow should save");
-        let loaded = WorkflowConfig::load_from_path(&workflow_path)
-            .expect("yaml workflow should load after saving");
+        let loaded =
+            WorkflowConfig::load(&workflow_path).expect("yaml workflow should load after saving");
 
         assert_eq!(loaded, workflow);
     }
@@ -620,8 +641,7 @@ finish = { name = "Finish", to = "review" }
         )
         .expect("yml workflow should be written");
 
-        let workflow =
-            WorkflowConfig::load_from_path(&workflow_path).expect("yml workflow should load");
+        let workflow = WorkflowConfig::load(&workflow_path).expect("yml workflow should load");
 
         assert_eq!(workflow.state_ids().collect::<Vec<_>>(), ["todo"]);
     }
@@ -638,10 +658,10 @@ finish = { name = "Finish", to = "review" }
         .expect("workflow should be valid");
 
         workflow
-            .save_to_path(&workflow_path)
+            .save(&workflow_path)
             .expect("yml workflow should save");
-        let loaded = WorkflowConfig::load_from_path(&workflow_path)
-            .expect("yml workflow should load after saving");
+        let loaded =
+            WorkflowConfig::load(&workflow_path).expect("yml workflow should load after saving");
 
         assert_eq!(loaded, workflow);
     }

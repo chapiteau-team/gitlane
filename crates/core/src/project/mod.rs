@@ -1,14 +1,12 @@
 use std::{collections::HashSet, path::Path};
 
 use crate::{
-    config::{ConfigKind, discover_config_path, impl_config},
+    codec,
     errors::{ConfigValidationError, GitlaneError},
     validate::validate_non_blank,
 };
 
-mod codec;
-pub mod toml;
-mod yaml;
+mod repr;
 
 /// Validated project metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,8 +16,6 @@ pub struct ProjectConfig {
     homepage: Option<String>,
     people: Vec<String>,
 }
-
-impl_config!(ProjectConfig);
 
 impl ProjectConfig {
     /// Build validated project metadata.
@@ -56,12 +52,14 @@ impl ProjectConfig {
         })
     }
 
-    /// Load and validate project configuration from the supported config file.
-    pub fn load(project_dir: &Path) -> Result<Self, GitlaneError> {
-        match discover_config_path(project_dir, ConfigKind::Project)? {
-            Some(config_path) => Self::load_from_path(&config_path),
-            None => toml::load(project_dir),
-        }
+    /// Loads this config from a supported file path.
+    pub fn load(config_path: &Path) -> Result<Self, GitlaneError> {
+        codec::load::<Self, repr::ProjectConfigRepr>(config_path)
+    }
+
+    /// Saves this config using the format implied by `config_path`.
+    pub fn save(&self, config_path: &Path) -> Result<(), GitlaneError> {
+        codec::save::<Self, repr::ProjectConfigRepr>(config_path, self)
     }
 
     /// Return the project display name.
@@ -92,13 +90,17 @@ mod tests {
     use std::{fs, path::Path};
 
     use crate::{
-        config::{ConfigFileExtension, ConfigKind, config_path},
-        errors::ConfigParseError,
+        codec,
+        config::{ConfigFileExtension, ConfigKind, config_path, require_config_path},
+        errors::{ConfigParseError, GitlaneError},
     };
     use tempfile::TempDir;
 
     fn parse_project_config(content: &str) -> Result<ProjectConfig, GitlaneError> {
-        toml::parse_str(content, Path::new("project.toml"))
+        codec::parse::<ProjectConfig, super::repr::ProjectConfigRepr>(
+            content,
+            Path::new("project.toml"),
+        )
     }
 
     #[test]
@@ -198,6 +200,19 @@ people = ["@alice", "@bob", "@carol"]
     }
 
     #[test]
+    fn errors_when_project_config_is_missing() {
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+
+        let err = require_config_path(temp_dir.path(), ConfigKind::Project)
+            .expect_err("missing project config should fail");
+
+        assert!(matches!(
+            err,
+            GitlaneError::MissingConfigFile { config_name, .. } if config_name == "project"
+        ));
+    }
+
+    #[test]
     fn saves_and_loads_toml_config() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let config_path = config_path(
@@ -214,9 +229,9 @@ people = ["@alice", "@bob", "@carol"]
         .expect("project config should be valid");
 
         config
-            .save_to_path(&config_path)
+            .save(&config_path)
             .expect("project config should save");
-        let loaded = toml::load_from_path(&config_path).expect("project config should load");
+        let loaded = ProjectConfig::load(&config_path).expect("project config should load");
 
         assert_eq!(loaded, config);
         assert_eq!(
@@ -250,7 +265,12 @@ people = ["@alice", "@bob", "@carol"]
         )
         .expect("yaml project config should be written");
 
-        let config = ProjectConfig::load(temp_dir.path()).expect("yaml project config should load");
+        let config = ProjectConfig::load(&config_path(
+            temp_dir.path(),
+            ConfigKind::Project,
+            ConfigFileExtension::Yaml,
+        ))
+        .expect("yaml project config should load");
 
         assert_eq!(config.name(), "Gitlane");
         assert_eq!(config.description(), Some("Git-native task tracker"));
@@ -277,7 +297,12 @@ people = ["@alice", "@bob", "@carol"]
         )
         .expect("yml project config should be written");
 
-        let config = ProjectConfig::load(temp_dir.path()).expect("yml project config should load");
+        let config = ProjectConfig::load(&config_path(
+            temp_dir.path(),
+            ConfigKind::Project,
+            ConfigFileExtension::Yml,
+        ))
+        .expect("yml project config should load");
 
         assert_eq!(config.name(), "Gitlane");
     }
@@ -299,9 +324,9 @@ people = ["@alice", "@bob", "@carol"]
         .expect("project config should be valid");
 
         config
-            .save_to_path(&config_path)
+            .save(&config_path)
             .expect("yaml project config should save");
-        let loaded = yaml::load_from_path(&config_path).expect("yaml project config should load");
+        let loaded = ProjectConfig::load(&config_path).expect("yaml project config should load");
 
         assert_eq!(loaded, config);
     }
@@ -318,9 +343,9 @@ people = ["@alice", "@bob", "@carol"]
             .expect("project config should be valid");
 
         config
-            .save_to_path(&config_path)
+            .save(&config_path)
             .expect("yml project config should save");
-        let loaded = yaml::load_from_path(&config_path).expect("yml project config should load");
+        let loaded = ProjectConfig::load(&config_path).expect("yml project config should load");
 
         assert_eq!(loaded, config);
     }
@@ -340,7 +365,7 @@ people = ["@alice", "@bob", "@carol"]
         )
         .expect("yaml project config should be written");
 
-        let err = ProjectConfig::load(project_dir)
+        let err = require_config_path(project_dir, ConfigKind::Project)
             .expect_err("multiple project config files should fail");
 
         assert!(matches!(err, GitlaneError::AmbiguousConfigFiles { .. }));
@@ -348,8 +373,11 @@ people = ["@alice", "@bob", "@carol"]
 
     #[test]
     fn reports_toml_parse_errors_with_unified_variant() {
-        let err = toml::parse_str("name = [", Path::new("project.toml"))
-            .expect_err("invalid TOML should fail");
+        let err = codec::parse::<ProjectConfig, super::repr::ProjectConfigRepr>(
+            "name = [",
+            Path::new("project.toml"),
+        )
+        .expect_err("invalid TOML should fail");
 
         assert!(matches!(
             err,
@@ -362,8 +390,11 @@ people = ["@alice", "@bob", "@carol"]
 
     #[test]
     fn reports_yaml_parse_errors_with_unified_variant() {
-        let err = yaml::parse_str("name: [", Path::new("project.yaml"))
-            .expect_err("invalid YAML should fail");
+        let err = codec::parse::<ProjectConfig, super::repr::ProjectConfigRepr>(
+            "name: [",
+            Path::new("project.yaml"),
+        )
+        .expect_err("invalid YAML should fail");
 
         assert!(matches!(
             err,

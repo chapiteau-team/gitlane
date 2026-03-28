@@ -4,6 +4,7 @@ use crate::errors::ConfigValidationError;
 
 use super::{WorkflowConfig, WorkflowState, WorkflowTransition};
 
+/// Builds the default workflow config scaffold.
 pub fn default() -> Result<WorkflowConfig, ConfigValidationError> {
     WorkflowConfig::new(
         "todo".to_owned(),

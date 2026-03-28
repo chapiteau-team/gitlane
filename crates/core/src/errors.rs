@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use crate::fs::FsError;
 
+/// Top-level error type for Gitlane core operations.
 #[derive(Debug, Error)]
 pub enum GitlaneError {
     #[error("project name must be a non-empty, non-whitespace string")]
@@ -26,6 +27,11 @@ pub enum GitlaneError {
     },
     #[error("unsupported config format for `{path}`; expected .toml, .yaml, or .yml")]
     UnsupportedConfigFormat { path: PathBuf },
+    #[error("missing supported {config_name} config file in `{directory}`")]
+    MissingConfigFile {
+        config_name: &'static str,
+        directory: PathBuf,
+    },
     #[error("found multiple supported {config_name} config files: {paths:?}")]
     AmbiguousConfigFiles {
         config_name: &'static str,
@@ -36,6 +42,7 @@ pub enum GitlaneError {
 }
 
 impl GitlaneError {
+    /// Builds an invalid-config error from a validation failure.
     pub fn invalid_config(path: &Path, source: ConfigValidationError) -> Self {
         Self::InvalidConfig {
             path: path.to_path_buf(),
@@ -43,6 +50,7 @@ impl GitlaneError {
         }
     }
 
+    /// Builds a parse error for a config file.
     pub fn parse_config(path: &Path, source: impl Into<ConfigParseError>) -> Self {
         Self::ParseConfig {
             path: path.to_path_buf(),
@@ -50,6 +58,7 @@ impl GitlaneError {
         }
     }
 
+    /// Builds a serialization error for a config file.
     pub fn serialize_config(path: &Path, source: impl Into<ConfigSerializeError>) -> Self {
         Self::SerializeConfig {
             path: path.to_path_buf(),
@@ -58,6 +67,7 @@ impl GitlaneError {
     }
 }
 
+/// Parser-specific errors for supported config formats.
 #[derive(Debug, Error)]
 pub enum ConfigParseError {
     #[error(transparent)]
@@ -75,6 +85,7 @@ impl ConfigParseError {
     }
 }
 
+/// Serializer-specific errors for supported config formats.
 #[derive(Debug, Error)]
 pub enum ConfigSerializeError {
     #[error(transparent)]
@@ -92,6 +103,7 @@ impl ConfigSerializeError {
     }
 }
 
+/// Validation error for parsed config content.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[error("{message}")]
 pub struct ConfigValidationError {
@@ -99,6 +111,7 @@ pub struct ConfigValidationError {
 }
 
 impl ConfigValidationError {
+    /// Creates a new validation error with a user-facing message.
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),

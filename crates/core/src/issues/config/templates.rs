@@ -4,6 +4,7 @@ use crate::errors::ConfigValidationError;
 
 use super::{IssuePriority, IssuesConfig};
 
+/// Builds the default issue config scaffold.
 pub fn default() -> Result<IssuesConfig, ConfigValidationError> {
     IssuesConfig::new(
         "ISS".to_owned(),

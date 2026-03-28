@@ -4,6 +4,7 @@ use crate::errors::ConfigValidationError;
 
 use super::{Label, LabelGroup, LabelsConfig};
 
+/// Builds the default labels config scaffold.
 pub fn default() -> Result<LabelsConfig, ConfigValidationError> {
     LabelsConfig::new(
         BTreeMap::from([(

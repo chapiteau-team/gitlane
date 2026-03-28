@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::{
+    config::{ConfigKind, require_config_path},
     errors::GitlaneError,
     init::{self, InitOptions},
     project::ProjectConfig,
@@ -19,9 +20,10 @@ pub struct Gitlane {
 impl Gitlane {
     /// Load an existing project from `project_path`.
     ///
-    /// This reads and validates the supported project config in the provided directory.
+    /// This resolves, reads, and validates the supported project config in the provided directory.
     pub fn load(project_path: PathBuf) -> Result<Self, GitlaneError> {
-        let project_config = ProjectConfig::load(&project_path)?;
+        let config_path = require_config_path(&project_path, ConfigKind::Project)?;
+        let project_config = ProjectConfig::load(&config_path)?;
 
         Ok(Self {
             project_path,
@@ -55,12 +57,12 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    use crate::config::{ConfigFileExtension, ConfigKind, default_config_path};
+    use crate::config::{ConfigFileExtension, ConfigKind, config_path};
 
     fn create_project_dir(project_dir: &Path, config: &str) -> PathBuf {
         fs::create_dir_all(project_dir).expect("project directory should be created");
         fs::write(
-            default_config_path(project_dir, ConfigKind::Project),
+            config_path(project_dir, ConfigKind::Project, ConfigFileExtension::Toml),
             config,
         )
         .expect("project config should be created");
@@ -122,7 +124,7 @@ name = ""
         assert!(matches!(
             err,
             GitlaneError::ProjectAlreadyExists { ref path }
-                if path == &default_config_path(&project_dir, ConfigKind::Project)
+                if path == &config_path(&project_dir, ConfigKind::Project, ConfigFileExtension::Toml)
         ));
     }
 }

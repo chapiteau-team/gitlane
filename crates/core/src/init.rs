@@ -1,18 +1,18 @@
 //! Project initialization routines.
 //!
 //! Initialization ensures the target directory exists, scaffolds issue
-//! workflow/config/label files, and creates `project.toml`.
+//! workflow/config/label files, and creates a project config file.
 
 use std::path::Path;
 
 use crate::{
     config::{
-        ConfigFileExtension, ConfigKind, config_path, default_config_path, discover_config_path,
+        ConfigFileExtension, ConfigKind, config_dir, config_path, discover_config_path,
+        require_config_path,
     },
     errors::GitlaneError,
     fs::ensure_directory,
     issues::{config, labels, workflow},
-    paths::ISSUES_DIR,
     project::ProjectConfig,
 };
 
@@ -83,7 +83,7 @@ fn ensure_issues_layout(
     project_path: &Path,
     format: ConfigFileExtension,
 ) -> Result<(), GitlaneError> {
-    let issues_dir = project_path.join(ISSUES_DIR);
+    let issues_dir = config_dir(project_path, ConfigKind::IssuesWorkflow);
     ensure_directory(&issues_dir)?;
 
     ensure_issue_scaffold_files(project_path, format)?;
@@ -94,10 +94,9 @@ fn ensure_issues_layout(
 
 /// Ensure all workflow state directories exist under `issues_dir`.
 fn ensure_issue_state_dirs(project_path: &Path) -> Result<(), GitlaneError> {
-    let issues_dir = project_path.join(ISSUES_DIR);
-    let workflow_path = discover_config_path(project_path, ConfigKind::Workflow)?
-        .unwrap_or_else(|| default_config_path(project_path, ConfigKind::Workflow));
-    let workflow = workflow::WorkflowConfig::load_from_path(&workflow_path)?;
+    let issues_dir = config_dir(project_path, ConfigKind::IssuesWorkflow);
+    let workflow_path = require_config_path(project_path, ConfigKind::IssuesWorkflow)?;
+    let workflow = workflow::WorkflowConfig::load(&workflow_path)?;
 
     for state in workflow.state_ids() {
         ensure_directory(&issues_dir.join(state))?;
@@ -128,22 +127,22 @@ fn create_project_config(project_path: &Path, options: InitOptions) -> Result<()
         Vec::new(),
     )
     .map_err(|source| GitlaneError::invalid_config(&config_path, source))?;
-    config.save_to_path(&config_path)
+    config.save(&config_path)
 }
 
 fn write_default_workflow_config_if_missing(
     project_path: &Path,
     format: ConfigFileExtension,
 ) -> Result<(), GitlaneError> {
-    if discover_config_path(project_path, ConfigKind::Workflow)?.is_some() {
+    if discover_config_path(project_path, ConfigKind::IssuesWorkflow)?.is_some() {
         return Ok(());
     }
 
-    let workflow_path = config_path(project_path, ConfigKind::Workflow, format);
+    let workflow_path = config_path(project_path, ConfigKind::IssuesWorkflow, format);
 
     let workflow = workflow::templates::default()
         .map_err(|source| GitlaneError::invalid_config(&workflow_path, source))?;
-    workflow.save_to_path(&workflow_path)?;
+    workflow.save(&workflow_path)?;
     Ok(())
 }
 
@@ -159,7 +158,7 @@ fn write_default_issues_config_if_missing(
 
     let config = config::templates::default()
         .map_err(|source| GitlaneError::invalid_config(&config_path, source))?;
-    config.save_to_path(&config_path)?;
+    config.save(&config_path)?;
     Ok(())
 }
 
@@ -167,15 +166,15 @@ fn write_default_labels_config_if_missing(
     project_path: &Path,
     format: ConfigFileExtension,
 ) -> Result<(), GitlaneError> {
-    if discover_config_path(project_path, ConfigKind::Labels)?.is_some() {
+    if discover_config_path(project_path, ConfigKind::IssuesLabels)?.is_some() {
         return Ok(());
     }
 
-    let config_path = config_path(project_path, ConfigKind::Labels, format);
+    let config_path = config_path(project_path, ConfigKind::IssuesLabels, format);
 
     let config = labels::templates::default()
         .map_err(|source| GitlaneError::invalid_config(&config_path, source))?;
-    config.save_to_path(&config_path)?;
+    config.save(&config_path)?;
     Ok(())
 }
 
@@ -186,8 +185,7 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use crate::{
-        config::{ConfigFileExtension, ConfigKind, config_path, default_config_path},
-        paths::ISSUES_DIR,
+        config::{ConfigFileExtension, ConfigKind, config_dir, config_path},
         project::ProjectConfig,
     };
     use tempfile::TempDir;
@@ -198,13 +196,15 @@ mod tests {
     }
 
     fn issues_file_path(project_path: &Path, kind: ConfigKind) -> PathBuf {
-        default_config_path(project_path, kind)
+        config_path(project_path, kind, ConfigFileExtension::Toml)
     }
 
     fn assert_issue_state_dirs_exist(project_path: &Path, expected_states: &[&str]) {
+        let issues_dir = config_dir(project_path, ConfigKind::IssuesWorkflow);
+
         for state in expected_states {
             assert!(
-                project_path.join(ISSUES_DIR).join(state).is_dir(),
+                issues_dir.join(state).is_dir(),
                 "state directory `{state}` should exist"
             );
         }
@@ -226,18 +226,24 @@ mod tests {
         )
         .expect("init should succeed");
 
-        let config = ProjectConfig::load(project_path).expect("project config should load");
+        let config = ProjectConfig::load(&config_path(
+            project_path,
+            ConfigKind::Project,
+            ConfigFileExtension::Toml,
+        ))
+        .expect("project config should load");
         assert_eq!(config.name(), "My Project");
         assert_eq!(config.description(), Some("Git-native tracker"));
         assert_eq!(config.homepage(), Some("https://example.com"));
 
-        assert!(issues_file_path(project_path, ConfigKind::Workflow).is_file());
+        assert!(issues_file_path(project_path, ConfigKind::IssuesWorkflow).is_file());
         assert!(issues_file_path(project_path, ConfigKind::Issues).is_file());
-        assert!(issues_file_path(project_path, ConfigKind::Labels).is_file());
+        assert!(issues_file_path(project_path, ConfigKind::IssuesLabels).is_file());
         assert_issue_state_dirs_exist(project_path, &["todo", "in_progress", "review", "done"]);
 
-        let labels_content = fs::read_to_string(issues_file_path(project_path, ConfigKind::Labels))
-            .expect("labels config should be readable");
+        let labels_content =
+            fs::read_to_string(issues_file_path(project_path, ConfigKind::IssuesLabels))
+                .expect("labels config should be readable");
         assert!(labels_content.contains("type_docs"));
     }
 
@@ -247,7 +253,12 @@ mod tests {
         let project_path = temp_dir.path();
         initialize(project_path, options("Fallback")).expect("init should succeed");
 
-        let config = ProjectConfig::load(project_path).expect("project config should load");
+        let config = ProjectConfig::load(&config_path(
+            project_path,
+            ConfigKind::Project,
+            ConfigFileExtension::Toml,
+        ))
+        .expect("project config should load");
         assert_eq!(config.name(), "Fallback");
     }
 
@@ -255,22 +266,26 @@ mod tests {
     fn initialize_completes_partial_scaffold_without_overwriting_existing_issue_files() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let existing_project_path = temp_dir.path();
-        let issues_dir = existing_project_path.join(ISSUES_DIR);
+        let issues_dir = config_dir(existing_project_path, ConfigKind::IssuesWorkflow);
         fs::create_dir_all(&issues_dir).expect("issues directory should be created");
 
-        let workflow_path = issues_file_path(existing_project_path, ConfigKind::Workflow);
+        let workflow_path = issues_file_path(existing_project_path, ConfigKind::IssuesWorkflow);
         let custom_workflow =
             "initial_state = \"custom\"\n[states]\ncustom = { name = \"Custom\" }\n";
         fs::write(&workflow_path, custom_workflow).expect("workflow config should be written");
 
-        let labels_path = issues_file_path(existing_project_path, ConfigKind::Labels);
+        let labels_path = issues_file_path(existing_project_path, ConfigKind::IssuesLabels);
         let custom_labels = "[labels]\ncustom = { name = \"Custom\" }\n";
         fs::write(&labels_path, custom_labels).expect("labels config should be written");
 
         initialize(existing_project_path, options("Unused")).expect("init should succeed");
 
-        let config =
-            ProjectConfig::load(existing_project_path).expect("project config should load");
+        let config = ProjectConfig::load(&config_path(
+            existing_project_path,
+            ConfigKind::Project,
+            ConfigFileExtension::Toml,
+        ))
+        .expect("project config should load");
         assert_eq!(config.name(), "Unused");
         assert_eq!(
             fs::read_to_string(&workflow_path).expect("workflow config should be readable"),
@@ -282,31 +297,21 @@ mod tests {
         );
         assert!(issues_file_path(existing_project_path, ConfigKind::Issues).is_file());
         assert_issue_state_dirs_exist(existing_project_path, &["custom"]);
-        assert!(!existing_project_path.join(ISSUES_DIR).join("todo").exists());
-        assert!(
-            !existing_project_path
-                .join(ISSUES_DIR)
-                .join("in_progress")
-                .exists()
-        );
-        assert!(
-            !existing_project_path
-                .join(ISSUES_DIR)
-                .join("review")
-                .exists()
-        );
-        assert!(!existing_project_path.join(ISSUES_DIR).join("done").exists());
+        assert!(!issues_dir.join("todo").exists());
+        assert!(!issues_dir.join("in_progress").exists());
+        assert!(!issues_dir.join("review").exists());
+        assert!(!issues_dir.join("done").exists());
     }
 
     #[test]
     fn initialize_fails_when_existing_workflow_is_invalid() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_path = temp_dir.path();
-        let issues_dir = project_path.join(ISSUES_DIR);
+        let issues_dir = config_dir(project_path, ConfigKind::IssuesWorkflow);
         fs::create_dir_all(&issues_dir).expect("issues directory should be created");
 
         fs::write(
-            issues_file_path(project_path, ConfigKind::Workflow),
+            issues_file_path(project_path, ConfigKind::IssuesWorkflow),
             "initial_state = \"todo\"\n[states]\nreview = { name = \"Review\" }\n",
         )
         .expect("workflow config should be written");
@@ -315,14 +320,17 @@ mod tests {
             .expect_err("init should fail for invalid workflow config");
 
         assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
-        assert!(!default_config_path(project_path, ConfigKind::Project).exists());
+        assert!(
+            !config_path(project_path, ConfigKind::Project, ConfigFileExtension::Toml).exists()
+        );
     }
 
     #[test]
     fn initialize_fails_when_project_config_already_exists() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_path = temp_dir.path();
-        let project_toml_path = default_config_path(project_path, ConfigKind::Project);
+        let project_toml_path =
+            config_path(project_path, ConfigKind::Project, ConfigFileExtension::Toml);
         fs::write(&project_toml_path, "name = \"Existing\"\n")
             .expect("project config should be written");
 
@@ -333,14 +341,15 @@ mod tests {
             err,
             GitlaneError::ProjectAlreadyExists { ref path } if path == &project_toml_path
         ));
-        assert!(!project_path.join(ISSUES_DIR).exists());
+        assert!(!config_dir(project_path, ConfigKind::IssuesWorkflow).exists());
     }
 
     #[test]
     fn initialize_does_not_update_existing_project_config() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_path = temp_dir.path();
-        let project_toml_path = default_config_path(project_path, ConfigKind::Project);
+        let project_toml_path =
+            config_path(project_path, ConfigKind::Project, ConfigFileExtension::Toml);
         let original_content = [
             "# keep this comment",
             "name = \"Existing\"",
@@ -385,8 +394,15 @@ mod tests {
 
         initialize(&project_path, options("demo")).expect("init should succeed");
 
-        assert!(default_config_path(&project_path, ConfigKind::Project).is_file());
-        assert!(issues_file_path(&project_path, ConfigKind::Workflow).is_file());
+        assert!(
+            config_path(
+                &project_path,
+                ConfigKind::Project,
+                ConfigFileExtension::Toml
+            )
+            .is_file()
+        );
+        assert!(issues_file_path(&project_path, ConfigKind::IssuesWorkflow).is_file());
     }
 
     #[test]
@@ -398,7 +414,14 @@ mod tests {
         initialize(&project_path, options("demo"))
             .expect("init should create missing parent directories");
 
-        assert!(default_config_path(&project_path, ConfigKind::Project).is_file());
+        assert!(
+            config_path(
+                &project_path,
+                ConfigKind::Project,
+                ConfigFileExtension::Toml
+            )
+            .is_file()
+        );
     }
 
     #[test]
@@ -419,26 +442,35 @@ mod tests {
         assert!(
             config_path(
                 project_path,
-                ConfigKind::Workflow,
+                ConfigKind::IssuesWorkflow,
                 ConfigFileExtension::Yaml
             )
             .is_file()
         );
         assert!(config_path(project_path, ConfigKind::Issues, ConfigFileExtension::Yaml).is_file());
-        assert!(config_path(project_path, ConfigKind::Labels, ConfigFileExtension::Yaml).is_file());
-        assert!(!default_config_path(project_path, ConfigKind::Project).exists());
+        assert!(
+            config_path(
+                project_path,
+                ConfigKind::IssuesLabels,
+                ConfigFileExtension::Yaml
+            )
+            .is_file()
+        );
+        assert!(
+            !config_path(project_path, ConfigKind::Project, ConfigFileExtension::Toml).exists()
+        );
     }
 
     #[test]
     fn initialize_uses_existing_yaml_workflow_in_partial_scaffold() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_path = temp_dir.path();
-        let issues_dir = project_path.join(ISSUES_DIR);
+        let issues_dir = config_dir(project_path, ConfigKind::IssuesWorkflow);
         fs::create_dir_all(&issues_dir).expect("issues directory should be created");
 
         let workflow_path = config_path(
             project_path,
-            ConfigKind::Workflow,
+            ConfigKind::IssuesWorkflow,
             ConfigFileExtension::Yaml,
         );
         fs::write(
@@ -458,21 +490,28 @@ mod tests {
             fs::read_to_string(&workflow_path).expect("workflow config should be readable"),
             "initial_state: custom\nstates:\n  custom:\n    name: Custom\n"
         );
-        assert!(project_path.join(ISSUES_DIR).join("custom").is_dir());
-        assert!(!default_config_path(project_path, ConfigKind::Workflow).exists());
+        assert!(issues_dir.join("custom").is_dir());
+        assert!(
+            !config_path(
+                project_path,
+                ConfigKind::IssuesWorkflow,
+                ConfigFileExtension::Toml
+            )
+            .exists()
+        );
     }
 
     #[test]
     fn initialize_fails_when_multiple_workflow_config_formats_exist() {
         let temp_dir = TempDir::new().expect("temp test directory should be created");
         let project_path = temp_dir.path();
-        let issues_dir = project_path.join(ISSUES_DIR);
+        let issues_dir = config_dir(project_path, ConfigKind::IssuesWorkflow);
         fs::create_dir_all(&issues_dir).expect("issues directory should be created");
 
         fs::write(
             config_path(
                 project_path,
-                ConfigKind::Workflow,
+                ConfigKind::IssuesWorkflow,
                 ConfigFileExtension::Toml,
             ),
             "initial_state = \"todo\"\n[states]\ntodo = { name = \"To Do\" }\n",
@@ -481,7 +520,7 @@ mod tests {
         fs::write(
             config_path(
                 project_path,
-                ConfigKind::Workflow,
+                ConfigKind::IssuesWorkflow,
                 ConfigFileExtension::Yaml,
             ),
             "initial_state: todo\nstates:\n  todo:\n    name: To Do\n",

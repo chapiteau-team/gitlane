@@ -1,25 +1,27 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::Path};
 
 use crate::{
-    config::impl_config,
-    errors::ConfigValidationError,
+    codec,
+    errors::{ConfigValidationError, GitlaneError},
     validate::{validate_id, validate_non_blank},
 };
 
-mod codec;
+mod repr;
 pub mod templates;
-pub mod toml;
-mod yaml;
 
+/// Stable identifier for a label.
 pub type LabelId = String;
+/// Stable identifier for a label group.
 pub type LabelGroupId = String;
 
+/// Validated label configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LabelsConfig {
     label_groups: BTreeMap<LabelGroupId, LabelGroup>,
     labels: BTreeMap<LabelId, Label>,
 }
 
+/// Validated label group definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LabelGroup {
     name: String,
@@ -27,6 +29,7 @@ pub struct LabelGroup {
     color: Option<String>,
 }
 
+/// Validated label definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Label {
     name: String,
@@ -35,9 +38,8 @@ pub struct Label {
     group: Option<LabelGroupId>,
 }
 
-impl_config!(LabelsConfig);
-
 impl LabelsConfig {
+    /// Builds validated label configuration.
     pub fn new(
         label_groups: BTreeMap<LabelGroupId, LabelGroup>,
         labels: BTreeMap<LabelId, Label>,
@@ -51,14 +53,27 @@ impl LabelsConfig {
         })
     }
 
+    /// Loads this config from a supported file path.
+    pub fn load(config_path: &Path) -> Result<Self, GitlaneError> {
+        codec::load::<Self, repr::LabelsConfigRepr>(config_path)
+    }
+
+    /// Saves this config using the format implied by `config_path`.
+    pub fn save(&self, config_path: &Path) -> Result<(), GitlaneError> {
+        codec::save::<Self, repr::LabelsConfigRepr>(config_path, self)
+    }
+
+    /// Returns label groups keyed by group id.
     pub fn label_groups(&self) -> &BTreeMap<LabelGroupId, LabelGroup> {
         &self.label_groups
     }
 
+    /// Returns labels keyed by label id.
     pub fn labels(&self) -> &BTreeMap<LabelId, Label> {
         &self.labels
     }
 
+    /// Resolves a label color, falling back to the group color when needed.
     pub fn resolved_color(&self, label_id: &str) -> Option<&str> {
         let label = self.labels.get(label_id)?;
         label.color().or_else(|| {
@@ -71,6 +86,7 @@ impl LabelsConfig {
 }
 
 impl LabelGroup {
+    /// Builds a validated label group.
     pub fn new(
         name: String,
         description: Option<String>,
@@ -85,20 +101,24 @@ impl LabelGroup {
         })
     }
 
+    /// Returns the display name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the optional description.
     pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
 
+    /// Returns the optional color.
     pub fn color(&self) -> Option<&str> {
         self.color.as_deref()
     }
 }
 
 impl Label {
+    /// Builds a validated label.
     pub fn new(
         name: String,
         description: Option<String>,
@@ -115,18 +135,22 @@ impl Label {
         })
     }
 
+    /// Returns the display name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the optional description.
     pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
 
+    /// Returns the optional explicit color.
     pub fn color(&self) -> Option<&str> {
         self.color.as_deref()
     }
 
+    /// Returns the optional referenced label group id.
     pub fn group(&self) -> Option<&str> {
         self.group.as_deref()
     }
@@ -193,7 +217,7 @@ mod tests {
 
     use std::{fs, path::Path};
 
-    use crate::errors::GitlaneError;
+    use crate::codec;
     use tempfile::TempDir;
 
     fn label_group(name: &str, color: Option<&str>) -> LabelGroup {
@@ -216,7 +240,10 @@ mod tests {
     }
 
     fn parse_labels_config(content: &str) -> Result<LabelsConfig, GitlaneError> {
-        toml::parse_str(content, Path::new("labels.toml"))
+        codec::parse::<LabelsConfig, super::repr::LabelsConfigRepr>(
+            content,
+            Path::new("labels.toml"),
+        )
     }
 
     #[test]
@@ -306,10 +333,10 @@ type_bug = { name = "   " }
         .expect("labels config should be valid");
 
         config
-            .save_to_path(&config_path)
+            .save(&config_path)
             .expect("labels config should save");
-        let loaded = LabelsConfig::load_from_path(&config_path)
-            .expect("labels config should load after saving");
+        let loaded =
+            LabelsConfig::load(&config_path).expect("labels config should load after saving");
 
         assert_eq!(loaded, config);
     }
@@ -336,8 +363,7 @@ type_bug = { name = "   " }
         )
         .expect("yaml labels config should be written");
 
-        let config =
-            LabelsConfig::load_from_path(&config_path).expect("yaml labels config should load");
+        let config = LabelsConfig::load(&config_path).expect("yaml labels config should load");
 
         assert_eq!(config.resolved_color("type_bug"), Some("#334155"));
         assert_eq!(config.resolved_color("blocked"), Some("#b91c1c"));
@@ -360,10 +386,10 @@ type_bug = { name = "   " }
         .expect("labels config should be valid");
 
         config
-            .save_to_path(&config_path)
+            .save(&config_path)
             .expect("yaml labels config should save");
-        let loaded = LabelsConfig::load_from_path(&config_path)
-            .expect("yaml labels config should load after saving");
+        let loaded =
+            LabelsConfig::load(&config_path).expect("yaml labels config should load after saving");
 
         assert_eq!(loaded, config);
     }
@@ -383,8 +409,7 @@ type_bug = { name = "   " }
         )
         .expect("yml labels config should be written");
 
-        let config =
-            LabelsConfig::load_from_path(&config_path).expect("yml labels config should load");
+        let config = LabelsConfig::load(&config_path).expect("yml labels config should load");
 
         assert_eq!(config.resolved_color("blocked"), Some("#b91c1c"));
     }
@@ -403,10 +428,10 @@ type_bug = { name = "   " }
         .expect("labels config should be valid");
 
         config
-            .save_to_path(&config_path)
+            .save(&config_path)
             .expect("yml labels config should save");
-        let loaded = LabelsConfig::load_from_path(&config_path)
-            .expect("yml labels config should load after saving");
+        let loaded =
+            LabelsConfig::load(&config_path).expect("yml labels config should load after saving");
 
         assert_eq!(loaded, config);
     }

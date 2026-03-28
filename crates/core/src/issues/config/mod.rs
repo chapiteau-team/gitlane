@@ -1,18 +1,21 @@
-use std::collections::{BTreeMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::Path,
+};
 
 use crate::{
-    config::impl_config,
-    errors::ConfigValidationError,
+    codec,
+    errors::{ConfigValidationError, GitlaneError},
     validate::{validate_id, validate_non_blank},
 };
 
-mod codec;
+mod repr;
 pub mod templates;
-pub mod toml;
-mod yaml;
 
+/// Stable identifier for an issue priority.
 pub type PriorityId = String;
 
+/// Validated issue tracker configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssuesConfig {
     issue_prefix: String,
@@ -20,8 +23,7 @@ pub struct IssuesConfig {
     priority_order: Vec<PriorityId>,
 }
 
-impl_config!(IssuesConfig);
-
+/// Validated issue priority definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssuePriority {
     name: String,
@@ -29,6 +31,7 @@ pub struct IssuePriority {
 }
 
 impl IssuesConfig {
+    /// Builds validated issue configuration.
     pub fn new(
         issue_prefix: String,
         priorities: BTreeMap<PriorityId, IssuePriority>,
@@ -45,30 +48,46 @@ impl IssuesConfig {
         })
     }
 
+    /// Loads this config from a supported file path.
+    pub fn load(config_path: &Path) -> Result<Self, GitlaneError> {
+        codec::load::<Self, repr::IssuesConfigRepr>(config_path)
+    }
+
+    /// Saves this config using the format implied by `config_path`.
+    pub fn save(&self, config_path: &Path) -> Result<(), GitlaneError> {
+        codec::save::<Self, repr::IssuesConfigRepr>(config_path, self)
+    }
+
+    /// Returns the issue id prefix.
     pub fn issue_prefix(&self) -> &str {
         &self.issue_prefix
     }
 
+    /// Returns priorities keyed by priority id.
     pub fn priorities(&self) -> &BTreeMap<PriorityId, IssuePriority> {
         &self.priorities
     }
 
+    /// Returns the priority display order.
     pub fn priority_order(&self) -> &[PriorityId] {
         &self.priority_order
     }
 }
 
 impl IssuePriority {
+    /// Builds a validated issue priority.
     pub fn new(name: String, description: Option<String>) -> Result<Self, ConfigValidationError> {
         validate_non_blank(&name, "issue priorities must have a non-empty `name`")?;
 
         Ok(Self { name, description })
     }
 
+    /// Returns the display name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the optional description.
     pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
@@ -159,7 +178,7 @@ mod tests {
 
     use std::{fs, path::Path};
 
-    use crate::errors::GitlaneError;
+    use crate::codec;
     use tempfile::TempDir;
 
     fn priority(name: &str, description: Option<&str>) -> IssuePriority {
@@ -168,7 +187,10 @@ mod tests {
     }
 
     fn parse_issues_config(content: &str) -> Result<IssuesConfig, GitlaneError> {
-        toml::parse_str(content, Path::new("issues.toml"))
+        codec::parse::<IssuesConfig, super::repr::IssuesConfigRepr>(
+            content,
+            Path::new("issues.toml"),
+        )
     }
 
     #[test]
@@ -314,10 +336,10 @@ p1 = { name = "Urgent" }
         .expect("issues config should be valid");
 
         config
-            .save_to_path(&config_path)
+            .save(&config_path)
             .expect("issues config should save");
-        let loaded = IssuesConfig::load_from_path(&config_path)
-            .expect("issues config should load after saving");
+        let loaded =
+            IssuesConfig::load(&config_path).expect("issues config should load after saving");
 
         assert_eq!(loaded, config);
     }
@@ -343,8 +365,7 @@ p1 = { name = "Urgent" }
         )
         .expect("yaml issues config should be written");
 
-        let config =
-            IssuesConfig::load_from_path(&config_path).expect("yaml issues config should load");
+        let config = IssuesConfig::load(&config_path).expect("yaml issues config should load");
 
         assert_eq!(config.issue_prefix(), "ISS");
         assert_eq!(
@@ -371,10 +392,10 @@ p1 = { name = "Urgent" }
         .expect("issues config should be valid");
 
         config
-            .save_to_path(&config_path)
+            .save(&config_path)
             .expect("yaml issues config should save");
-        let loaded = IssuesConfig::load_from_path(&config_path)
-            .expect("yaml issues config should load after saving");
+        let loaded =
+            IssuesConfig::load(&config_path).expect("yaml issues config should load after saving");
 
         assert_eq!(loaded, config);
     }
@@ -396,8 +417,7 @@ p1 = { name = "Urgent" }
         )
         .expect("yml issues config should be written");
 
-        let config =
-            IssuesConfig::load_from_path(&config_path).expect("yml issues config should load");
+        let config = IssuesConfig::load(&config_path).expect("yml issues config should load");
 
         assert_eq!(config.issue_prefix(), "ISS");
     }
@@ -414,10 +434,10 @@ p1 = { name = "Urgent" }
         .expect("issues config should be valid");
 
         config
-            .save_to_path(&config_path)
+            .save(&config_path)
             .expect("yml issues config should save");
-        let loaded = IssuesConfig::load_from_path(&config_path)
-            .expect("yml issues config should load after saving");
+        let loaded =
+            IssuesConfig::load(&config_path).expect("yml issues config should load after saving");
 
         assert_eq!(loaded, config);
     }

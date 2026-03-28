@@ -2,30 +2,40 @@ use std::path::{Path, PathBuf};
 
 use crate::{errors::GitlaneError, fs::ensure_file, paths::ISSUES_DIR};
 
+/// Basename for the project config file.
 pub const PROJECT_CONFIG_STEM: &str = "project";
-pub const WORKFLOW_CONFIG_STEM: &str = "workflow";
-pub const ISSUES_CONFIG_STEM: &str = "issues";
-pub const LABELS_CONFIG_STEM: &str = "labels";
 
+/// Basename for the issue config file.
+pub const ISSUES_CONFIG_STEM: &str = "issues";
+
+/// Basename for the issues labels config file.
+pub const ISSUES_LABELS_CONFIG_STEM: &str = "labels";
+
+/// Basename for the issues workflow config file.
+pub const ISSUES_WORKFLOW_CONFIG_STEM: &str = "workflow";
+
+/// Logical config file kinds supported by Gitlane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigKind {
     Project,
-    Workflow,
     Issues,
-    Labels,
+    IssuesLabels,
+    IssuesWorkflow,
 }
 
 impl ConfigKind {
+    /// Returns the basename used for this config file kind.
     pub const fn stem(self) -> &'static str {
         match self {
             Self::Project => PROJECT_CONFIG_STEM,
-            Self::Workflow => WORKFLOW_CONFIG_STEM,
             Self::Issues => ISSUES_CONFIG_STEM,
-            Self::Labels => LABELS_CONFIG_STEM,
+            Self::IssuesLabels => ISSUES_LABELS_CONFIG_STEM,
+            Self::IssuesWorkflow => ISSUES_WORKFLOW_CONFIG_STEM,
         }
     }
 }
 
+/// File extensions accepted for config files.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigFileExtension {
     Toml,
@@ -34,6 +44,7 @@ pub enum ConfigFileExtension {
 }
 
 impl ConfigFileExtension {
+    /// Returns the file extension without a leading dot.
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Toml => "toml",
@@ -42,10 +53,12 @@ impl ConfigFileExtension {
         }
     }
 
+    /// Returns all supported config file extensions.
     pub const fn all() -> [Self; 3] {
         [Self::Toml, Self::Yaml, Self::Yml]
     }
 
+    /// Infers the config file extension from a path.
     pub fn from_path(path: &Path) -> Result<Self, GitlaneError> {
         match path.extension().and_then(|extension| extension.to_str()) {
             Some("toml") => Ok(Self::Toml),
@@ -58,14 +71,27 @@ impl ConfigFileExtension {
     }
 }
 
+/// Returns the parent directory that stores a config kind.
+pub fn config_dir(project_dir: &Path, kind: ConfigKind) -> PathBuf {
+    match kind {
+        ConfigKind::Project => project_dir.to_path_buf(),
+        ConfigKind::IssuesWorkflow | ConfigKind::Issues | ConfigKind::IssuesLabels => {
+            project_dir.join(ISSUES_DIR)
+        }
+    }
+}
+
+/// Returns the filename for a config kind and extension.
 pub fn config_file_name(kind: ConfigKind, extension: ConfigFileExtension) -> String {
     format!("{}.{}", kind.stem(), extension.as_str())
 }
 
+/// Returns all supported filenames for a config kind.
 pub fn config_file_names(kind: ConfigKind) -> [String; 3] {
     ConfigFileExtension::all().map(|extension| config_file_name(kind, extension))
 }
 
+/// Returns the config path for a project, kind, and extension.
 pub fn config_path(
     project_dir: &Path,
     kind: ConfigKind,
@@ -74,14 +100,15 @@ pub fn config_path(
     config_dir(project_dir, kind).join(config_file_name(kind, extension))
 }
 
-pub fn default_config_path(project_dir: &Path, kind: ConfigKind) -> PathBuf {
-    config_path(project_dir, kind, ConfigFileExtension::Toml)
-}
-
+/// Returns candidate paths for all supported extensions.
 pub fn config_candidate_paths(project_dir: &Path, kind: ConfigKind) -> [PathBuf; 3] {
     ConfigFileExtension::all().map(|extension| config_path(project_dir, kind, extension))
 }
 
+/// Finds the single supported config file for a kind.
+///
+/// Returns `Ok(None)` when no config file exists and errors when multiple
+/// supported files exist for the same logical config.
 pub fn discover_config_path(
     project_dir: &Path,
     kind: ConfigKind,
@@ -105,44 +132,10 @@ pub fn discover_config_path(
     }
 }
 
-fn config_dir(project_dir: &Path, kind: ConfigKind) -> PathBuf {
-    match kind {
-        ConfigKind::Project => project_dir.to_path_buf(),
-        ConfigKind::Workflow | ConfigKind::Issues | ConfigKind::Labels => {
-            project_dir.join(ISSUES_DIR)
-        }
-    }
+/// Finds the single required config file for a kind.
+pub fn require_config_path(project_dir: &Path, kind: ConfigKind) -> Result<PathBuf, GitlaneError> {
+    discover_config_path(project_dir, kind)?.ok_or_else(|| GitlaneError::MissingConfigFile {
+        config_name: kind.stem(),
+        directory: config_dir(project_dir, kind),
+    })
 }
-
-macro_rules! impl_config {
-    ($type:ident) => {
-        impl $type {
-            pub fn load_from_path(
-                config_path: &std::path::Path,
-            ) -> Result<Self, $crate::errors::GitlaneError> {
-                match $crate::config::ConfigFileExtension::from_path(config_path)? {
-                    $crate::config::ConfigFileExtension::Toml => toml::load_from_path(config_path),
-                    $crate::config::ConfigFileExtension::Yaml
-                    | $crate::config::ConfigFileExtension::Yml => yaml::load_from_path(config_path),
-                }
-            }
-
-            pub fn save_to_path(
-                &self,
-                config_path: &std::path::Path,
-            ) -> Result<(), $crate::errors::GitlaneError> {
-                match $crate::config::ConfigFileExtension::from_path(config_path)? {
-                    $crate::config::ConfigFileExtension::Toml => {
-                        toml::save_to_path(config_path, self)
-                    }
-                    $crate::config::ConfigFileExtension::Yaml
-                    | $crate::config::ConfigFileExtension::Yml => {
-                        yaml::save_to_path(config_path, self)
-                    }
-                }
-            }
-        }
-    };
-}
-
-pub(crate) use impl_config;
