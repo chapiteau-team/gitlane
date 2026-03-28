@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::errors::ConfigValidationError;
+use crate::{codec::TomlFormat, errors::ConfigValidationError};
 
 use super::ProjectConfig;
 
@@ -33,3 +33,5 @@ impl From<&ProjectConfig> for ProjectConfigRepr {
         }
     }
 }
+
+impl TomlFormat for ProjectConfigRepr {}

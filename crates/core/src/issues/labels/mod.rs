@@ -339,6 +339,17 @@ type_bug = { name = "   " }
             LabelsConfig::load(&config_path).expect("labels config should load after saving");
 
         assert_eq!(loaded, config);
+        assert_eq!(
+            fs::read_to_string(config_path).expect("labels config should be readable"),
+            concat!(
+                "[label_groups]\n",
+                "type = { name = \"Type\", description = \"Group description\", color = \"#334155\" }\n",
+                "\n",
+                "[labels]\n",
+                "blocked = { name = \"Blocked\", description = \"Label description\", color = \"#b91c1c\" }\n",
+                "type_bug = { name = \"Bug\", description = \"Label description\", group = \"type\" }\n",
+            )
+        );
     }
 
     #[test]

@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::ConfigValidationError;
+use crate::{
+    codec::{TomlFormat, inline_child_tables, table_mut},
+    errors::ConfigValidationError,
+};
 
 use super::{Label, LabelGroup, LabelGroupId, LabelId, LabelsConfig};
 
@@ -105,6 +108,18 @@ impl From<&LabelsConfig> for LabelsConfigRepr {
         Self {
             label_groups,
             labels,
+        }
+    }
+}
+
+impl TomlFormat for LabelsConfigRepr {
+    fn format_toml_document(&self, document: &mut toml_edit::DocumentMut) {
+        if let Some(label_groups) = table_mut(document, "label_groups") {
+            inline_child_tables(label_groups);
+        }
+
+        if let Some(labels) = table_mut(document, "labels") {
+            inline_child_tables(labels);
         }
     }
 }

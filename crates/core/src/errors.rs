@@ -92,7 +92,7 @@ impl ConfigParseError {
 #[derive(Debug, Error)]
 pub enum ConfigSerializeError {
     #[error(transparent)]
-    Toml(#[from] toml::ser::Error),
+    Toml(#[from] toml_edit::ser::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]

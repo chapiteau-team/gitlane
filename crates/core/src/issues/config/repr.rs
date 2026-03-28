@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::ConfigValidationError;
+use crate::{
+    codec::{TomlFormat, inline_child_tables, table_mut},
+    errors::ConfigValidationError,
+};
 
 use super::{IssuePriority, IssuesConfig, PriorityId};
 
@@ -65,6 +68,14 @@ impl From<&IssuesConfig> for IssuesConfigRepr {
             issue_prefix: config.issue_prefix().to_owned(),
             priorities,
             priority_order: config.priority_order().to_vec(),
+        }
+    }
+}
+
+impl TomlFormat for IssuesConfigRepr {
+    fn format_toml_document(&self, document: &mut toml_edit::DocumentMut) {
+        if let Some(priorities) = table_mut(document, "priorities") {
+            inline_child_tables(priorities);
         }
     }
 }

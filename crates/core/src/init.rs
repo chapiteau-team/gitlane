@@ -244,7 +244,23 @@ mod tests {
         let labels_content =
             fs::read_to_string(issues_file_path(project_path, ConfigKind::IssuesLabels))
                 .expect("labels config should be readable");
-        assert!(labels_content.contains("type_docs"));
+        assert_eq!(
+            labels_content,
+            concat!(
+                "[label_groups]\n",
+                "type = { name = \"Type\", description = \"Issue classification\", color = \"#334155\" }\n",
+                "\n",
+                "[labels]\n",
+                "blocked = { name = \"Blocked\", description = \"Waiting on external dependency\", color = \"#b91c1c\" }\n",
+                "good_first_issue = { name = \"Good First Issue\", description = \"Suitable for new contributors\", color = \"#0369a1\" }\n",
+                "needs_decision = { name = \"Needs Decision\", description = \"Requires product or technical decision\", color = \"#b45309\" }\n",
+                "type_bug = { name = \"Bug\", description = \"Unexpected behavior\", group = \"type\" }\n",
+                "type_chore = { name = \"Chore\", description = \"Maintenance and tooling work\", group = \"type\" }\n",
+                "type_docs = { name = \"Docs\", description = \"Documentation updates\", group = \"type\" }\n",
+                "type_feature = { name = \"Feature\", description = \"Net-new capability\", group = \"type\" }\n",
+                "type_refactor = { name = \"Refactor\", description = \"Internal structure improvements\", group = \"type\" }\n",
+            )
+        );
     }
 
     #[test]

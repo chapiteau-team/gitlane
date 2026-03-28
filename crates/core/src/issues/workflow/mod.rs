@@ -571,6 +571,19 @@ finish = { name = "Finish", to = "review" }
             WorkflowConfig::load(&workflow_path).expect("workflow should load after saving");
 
         assert_eq!(loaded, workflow);
+        assert_eq!(
+            fs::read_to_string(workflow_path).expect("workflow config should be readable"),
+            concat!(
+                "initial_state = \"todo\"\n",
+                "\n",
+                "[states]\n",
+                "done = { name = \"Done\" }\n",
+                "todo = { name = \"To Do\" }\n",
+                "\n",
+                "[transitions.todo]\n",
+                "finish = { name = \"Finish\", to = \"done\" }\n",
+            )
+        );
     }
 
     #[test]

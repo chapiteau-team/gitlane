@@ -342,6 +342,17 @@ p1 = { name = "Urgent" }
             IssuesConfig::load(&config_path).expect("issues config should load after saving");
 
         assert_eq!(loaded, config);
+        assert_eq!(
+            fs::read_to_string(config_path).expect("issues config should be readable"),
+            concat!(
+                "issue_prefix = \"ISS\"\n",
+                "priority_order = [\"p1\", \"p0\"]\n",
+                "\n",
+                "[priorities]\n",
+                "p0 = { name = \"No Priority\" }\n",
+                "p1 = { name = \"Urgent\", description = \"Needs immediate attention\" }\n",
+            )
+        );
     }
 
     #[test]

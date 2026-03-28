@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::ConfigValidationError;
+use crate::{
+    codec::{TomlFormat, ensure_table, inline_child_tables, table_mut},
+    errors::ConfigValidationError,
+};
 
 use super::{StateId, TransitionId, WorkflowConfig, WorkflowState, WorkflowTransition};
 
@@ -116,6 +119,24 @@ impl From<&WorkflowConfig> for WorkflowConfigRepr {
             initial_state: config.initial_state().to_owned(),
             states,
             transitions,
+        }
+    }
+}
+
+impl TomlFormat for WorkflowConfigRepr {
+    fn format_toml_document(&self, document: &mut toml_edit::DocumentMut) {
+        if let Some(states) = table_mut(document, "states") {
+            inline_child_tables(states);
+        }
+
+        if let Some(transitions) = table_mut(document, "transitions") {
+            for (_, transition_group) in transitions.iter_mut() {
+                if let Some(transition_group) = ensure_table(transition_group) {
+                    inline_child_tables(transition_group);
+                }
+            }
+
+            transitions.set_implicit(true);
         }
     }
 }
