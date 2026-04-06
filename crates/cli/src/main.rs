@@ -62,11 +62,12 @@ fn infer_project_name(project_root: &Path) -> anyhow::Result<String> {
 mod tests {
     use super::*;
 
-    use std::path::PathBuf;
+    use tempfile::TempDir;
 
     #[test]
     fn infers_project_name_from_directory_name() {
-        let project_root = PathBuf::from("/tmp/example-project");
+        let temp_dir = TempDir::new().expect("temp test directory should be created");
+        let project_root = temp_dir.path().join("example-project");
 
         let name = infer_project_name(&project_root).expect("project name should be inferred");
 
@@ -75,11 +76,17 @@ mod tests {
 
     #[test]
     fn errors_when_project_name_cannot_be_inferred() {
-        let err = infer_project_name(Path::new("/")).expect_err("root path should fail");
+        let current_dir = std::env::current_dir().expect("current directory should resolve");
+        let root = current_dir
+            .ancestors()
+            .last()
+            .expect("filesystem root should exist");
+        let err = infer_project_name(root).expect_err("root path should fail");
 
         assert!(
             err.to_string()
-                .contains("failed to infer project name from `/`; pass `--name`")
+                .contains("failed to infer project name from `")
         );
+        assert!(err.to_string().contains("pass `--name`"));
     }
 }

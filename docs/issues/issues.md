@@ -27,6 +27,16 @@ config is ambiguous.
 - `priorities`: map of priority id to priority config.
 - `priority_order`: ordered list of priority ids from highest to lowest.
 
+`issue_prefix` must:
+
+- Be non-empty.
+- Not have leading or trailing whitespace.
+- Be a portable filesystem-safe path segment because issue ids become directory names.
+- Not contain `/`, `\`, `<`, `>`, `:`, `"`, `|`, `?`, or `*`.
+- Not be `.` or `..`.
+- Not end with `.` or a space.
+- Not use Windows reserved device names such as `CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`, or `LPT1`-`LPT9`.
+
 ### Priority schema
 
 Each priority id is the key in `[priorities]`.

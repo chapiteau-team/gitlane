@@ -6,7 +6,7 @@ use std::{
 use crate::{
     codec,
     errors::{ConfigValidationError, GitlaneError},
-    validate::{validate_id, validate_non_blank},
+    validate::{validate_id, validate_non_blank, validate_path_segment},
 };
 
 mod repr;
@@ -94,10 +94,11 @@ impl IssuePriority {
 }
 
 fn validate_issue_prefix(issue_prefix: &str) -> Result<(), ConfigValidationError> {
-    validate_id(
+    validate_path_segment(
         issue_prefix,
         "`issue_prefix` must be a non-empty string",
         "`issue_prefix` must not have leading or trailing whitespace",
+        "`issue_prefix` must be a portable filesystem-safe path segment",
     )
 }
 
@@ -265,6 +266,38 @@ p1 = { name = "Urgent" }
 "#,
         )
         .expect_err("empty prefix should fail");
+
+        assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
+    }
+
+    #[test]
+    fn rejects_issue_prefix_with_path_separator() {
+        let err = parse_issues_config(
+            r#"
+issue_prefix = "ISS/TEAM"
+priority_order = ["p1"]
+
+[priorities]
+p1 = { name = "Urgent" }
+"#,
+        )
+        .expect_err("prefix with path separator should fail");
+
+        assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
+    }
+
+    #[test]
+    fn rejects_issue_prefix_with_windows_reserved_name() {
+        let err = parse_issues_config(
+            r#"
+issue_prefix = "NUL"
+priority_order = ["p1"]
+
+[priorities]
+p1 = { name = "Urgent" }
+"#,
+        )
+        .expect_err("reserved prefix should fail");
 
         assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
     }

@@ -29,7 +29,19 @@ Required top-level fields:
 - `states`: map of state id to state config.
 - `transitions`: map of source state id to transition map.
 
-Workflow ids must be non-empty and must not have leading or trailing whitespace.
+Workflow state ids must:
+
+- Be non-empty.
+- Not have leading or trailing whitespace.
+- Be portable filesystem-safe path segments because they map directly to directories under `.gitlane/issues`.
+- Not contain `/`, `\`, `<`, `>`, `:`, `"`, `|`, `?`, or `*`.
+- Not be `.` or `..`.
+- Not end with `.` or a space.
+- Not use Windows reserved device names such as `CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`, or `LPT1`-`LPT9`.
+
+Transition ids must be non-empty and must not have leading or trailing whitespace.
+
+`initial_state`, transition source ids, and transition `to` values must use valid workflow state ids.
 
 ### State schema
 

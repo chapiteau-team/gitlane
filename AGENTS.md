@@ -135,6 +135,8 @@ If one cannot be run locally, explicitly note that in your handoff.
 - `init` accepts `--format toml|json|yaml|yml` for config files it creates and defaults to `toml`.
 - If more than one supported config file exists for the same logical config (`project`, `workflow`, `issues`, or
   `labels`), treat that as an error rather than guessing.
+- Workflow state ids and `issue_prefix` values become filesystem path segments; keep them portable across Linux,
+  macOS, and Windows per `docs/issues/workflow.md` and `docs/issues/issues.md`.
 - Before changing CLI behavior or config/data validation, read the relevant doc first:
   - `docs/cli.md` (command surface and expected behavior)
   - `docs/project.md` (`.gitlane/project.{toml,json,yaml,yml}` schema)
