@@ -45,6 +45,15 @@ If any of these files appear later, treat them as high-priority constraints and 
 - Run tests and show stdout/stderr: `cargo test --workspace -- --nocapture`
 - List discovered tests: `cargo test --workspace -- --list`
 
+### GitHub CI
+- Workflow file: `.github/workflows/ci.yml`
+- Triggers: pushes to `main`, pull requests, and `workflow_dispatch`
+- `lint` job (`ubuntu-latest`):
+  - `cargo fmt --all -- --check`
+  - `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- `test` job matrix (`ubuntu-latest`, `windows-latest`, `macos-latest`):
+  - `cargo test --workspace`
+
 ### Running a Single Test (important)
 - By substring match: `cargo test -p <package> name_substring`
 - Exact unit test name: `cargo test -p <package> exact_test_name -- --exact`
@@ -153,6 +162,7 @@ If one cannot be run locally, explicitly note that in your handoff.
 - Format check: `cargo fmt --all -- --check`
 - Lint: `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - Test all: `cargo test --workspace`
+- GitHub CI workflow: `.github/workflows/ci.yml`
 - Test one (substring): `cargo test -p <package> name_substring`
 - Test one (exact): `cargo test -p <package> exact_test_name -- --exact`
 - List tests: `cargo test --workspace -- --list`

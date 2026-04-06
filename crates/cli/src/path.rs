@@ -118,6 +118,8 @@ mod tests {
         .expect("project config should be created");
 
         gitlane_dir
+            .canonicalize()
+            .expect(".gitlane path should canonicalize")
     }
 
     #[test]

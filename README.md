@@ -1,5 +1,7 @@
 # Gitlane
 
+[![CI](https://github.com/chapiteau-team/gitlane/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/chapiteau-team/gitlane/actions/workflows/ci.yml)
+
 Gitlane is a Git-native task tracker.
 All tracker data is stored as Markdown files in the repository.
 
