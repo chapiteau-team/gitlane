@@ -3,7 +3,7 @@
 //! Initialization ensures the target directory exists, scaffolds issue
 //! workflow/config/label files, and creates a project config file.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::{
     config::{
@@ -11,8 +11,9 @@ use crate::{
         require_config_path,
     },
     errors::GitlaneError,
-    fs::ensure_directory,
+    fs::{ensure_directory, ensure_file, write_text_file},
     issues::{config, labels, workflow},
+    paths::{DEFAULT_ISSUE_TEMPLATE_NAME, ISSUE_FILE_NAME, ISSUE_TEMPLATES_DIR},
     project::ProjectConfig,
 };
 
@@ -47,6 +48,26 @@ impl InitOptions {
             homepage,
             format,
         })
+    }
+}
+
+fn issue_templates_dir(project_path: &Path) -> PathBuf {
+    config_dir(project_path, ConfigKind::IssuesWorkflow).join(ISSUE_TEMPLATES_DIR)
+}
+
+fn default_issue_template_dir(project_path: &Path) -> PathBuf {
+    issue_templates_dir(project_path).join(DEFAULT_ISSUE_TEMPLATE_NAME)
+}
+
+fn default_issue_template_path(project_path: &Path) -> PathBuf {
+    default_issue_template_dir(project_path).join(ISSUE_FILE_NAME)
+}
+
+fn default_issue_template_content(format: ConfigFileExtension) -> &'static str {
+    match format {
+        ConfigFileExtension::Toml => "+++\n+++\n",
+        ConfigFileExtension::Json => "{\n}\n",
+        ConfigFileExtension::Yaml | ConfigFileExtension::Yml => "---\n---\n",
     }
 }
 
@@ -113,6 +134,7 @@ fn ensure_issue_scaffold_files(
     write_default_workflow_config_if_missing(project_path, format)?;
     write_default_issues_config_if_missing(project_path, format)?;
     write_default_labels_config_if_missing(project_path, format)?;
+    write_default_issue_template_if_missing(project_path, format)?;
 
     Ok(())
 }
@@ -178,6 +200,26 @@ fn write_default_labels_config_if_missing(
     Ok(())
 }
 
+fn write_default_issue_template_if_missing(
+    project_path: &Path,
+    format: ConfigFileExtension,
+) -> Result<(), GitlaneError> {
+    let templates_dir = issue_templates_dir(project_path);
+    ensure_directory(&templates_dir)?;
+
+    let template_dir = default_issue_template_dir(project_path);
+    ensure_directory(&template_dir)?;
+
+    let template_path = default_issue_template_path(project_path);
+    if template_path.exists() {
+        ensure_file(&template_path)?;
+        return Ok(());
+    }
+
+    write_text_file(&template_path, default_issue_template_content(format))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,6 +281,7 @@ mod tests {
         assert!(issues_file_path(project_path, ConfigKind::IssuesWorkflow).is_file());
         assert!(issues_file_path(project_path, ConfigKind::Issues).is_file());
         assert!(issues_file_path(project_path, ConfigKind::IssuesLabels).is_file());
+        assert!(default_issue_template_path(project_path).is_file());
         assert_issue_state_dirs_exist(project_path, &["todo", "in_progress", "review", "done"]);
 
         let labels_content =
@@ -260,6 +303,11 @@ mod tests {
                 "type_feature = { name = \"Feature\", description = \"Net-new capability\", group = \"type\" }\n",
                 "type_refactor = { name = \"Refactor\", description = \"Internal structure improvements\", group = \"type\" }\n",
             )
+        );
+        assert_eq!(
+            fs::read_to_string(default_issue_template_path(project_path))
+                .expect("default issue template should be readable"),
+            default_issue_template_content(ConfigFileExtension::Toml)
         );
     }
 
@@ -294,6 +342,17 @@ mod tests {
         let custom_labels = "[labels]\ncustom = { name = \"Custom\" }\n";
         fs::write(&labels_path, custom_labels).expect("labels config should be written");
 
+        let template_path = default_issue_template_path(existing_project_path);
+        fs::create_dir_all(
+            template_path
+                .parent()
+                .expect("default issue template should have parent directory"),
+        )
+        .expect("default issue template parent should be created");
+        let custom_template = "+++\ntitle = \"Keep me\"\n+++\n";
+        fs::write(&template_path, custom_template)
+            .expect("default issue template should be written");
+
         initialize(existing_project_path, options("Unused")).expect("init should succeed");
 
         let config = ProjectConfig::load(&config_path(
@@ -310,6 +369,10 @@ mod tests {
         assert_eq!(
             fs::read_to_string(&labels_path).expect("labels config should be readable"),
             custom_labels
+        );
+        assert_eq!(
+            fs::read_to_string(&template_path).expect("default issue template should be readable"),
+            custom_template
         );
         assert!(issues_file_path(existing_project_path, ConfigKind::Issues).is_file());
         assert_issue_state_dirs_exist(existing_project_path, &["custom"]);
@@ -472,6 +535,12 @@ mod tests {
             )
             .is_file()
         );
+        assert!(default_issue_template_path(project_path).is_file());
+        assert_eq!(
+            fs::read_to_string(default_issue_template_path(project_path))
+                .expect("default issue template should be readable"),
+            default_issue_template_content(ConfigFileExtension::Yaml)
+        );
         assert!(
             !config_path(project_path, ConfigKind::Project, ConfigFileExtension::Toml).exists()
         );
@@ -509,6 +578,12 @@ mod tests {
             )
             .is_file()
         );
+        assert!(default_issue_template_path(project_path).is_file());
+        assert_eq!(
+            fs::read_to_string(default_issue_template_path(project_path))
+                .expect("default issue template should be readable"),
+            default_issue_template_content(ConfigFileExtension::Json)
+        );
         assert!(
             !config_path(project_path, ConfigKind::Project, ConfigFileExtension::Toml).exists()
         );
@@ -542,6 +617,11 @@ mod tests {
         assert_eq!(
             fs::read_to_string(&workflow_path).expect("workflow config should be readable"),
             "initial_state: custom\nstates:\n  custom:\n    name: Custom\n"
+        );
+        assert_eq!(
+            fs::read_to_string(default_issue_template_path(project_path))
+                .expect("default issue template should be readable"),
+            default_issue_template_content(ConfigFileExtension::Toml)
         );
         assert!(issues_dir.join("custom").is_dir());
         assert!(

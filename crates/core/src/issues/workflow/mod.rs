@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, path::Path};
 use crate::{
     codec,
     errors::{ConfigValidationError, GitlaneError},
+    paths::ISSUE_TEMPLATES_DIR,
     validate::{validate_id, validate_non_blank, validate_path_segment},
 };
 
@@ -103,11 +104,12 @@ impl WorkflowTransition {
     pub fn new(name: String, to: StateId) -> Result<Self, ConfigValidationError> {
         validate_non_blank(&name, "workflow transitions must have a non-empty `name`")?;
 
-        validate_path_segment(
+        validate_state_id(
             &to,
             "workflow transitions must target a non-empty state id",
             "workflow transitions must target a state id without leading or trailing whitespace",
             "workflow transitions must target a portable filesystem-safe state id",
+            "workflow transitions must not target reserved state id `templates`",
         )?;
 
         Ok(Self { name, to })
@@ -124,15 +126,32 @@ impl WorkflowTransition {
     }
 }
 
+fn validate_state_id(
+    state_id: &str,
+    empty_message: &str,
+    whitespace_message: &str,
+    path_message: &str,
+    reserved_message: &str,
+) -> Result<(), ConfigValidationError> {
+    validate_path_segment(state_id, empty_message, whitespace_message, path_message)?;
+
+    if state_id == ISSUE_TEMPLATES_DIR {
+        return Err(ConfigValidationError::new(reserved_message));
+    }
+
+    Ok(())
+}
+
 fn validate_initial_state(
     initial_state: &StateId,
     states: &BTreeMap<StateId, WorkflowState>,
 ) -> Result<(), ConfigValidationError> {
-    validate_path_segment(
+    validate_state_id(
         initial_state,
         "`initial_state` must be a non-empty state id",
         "`initial_state` must not have leading or trailing whitespace",
         "`initial_state` must be a portable filesystem-safe state id",
+        "`initial_state` must not use reserved state id `templates`",
     )?;
 
     if !states.contains_key(initial_state) {
@@ -152,11 +171,12 @@ fn validate_states(states: &BTreeMap<StateId, WorkflowState>) -> Result<(), Conf
     }
 
     for (state_id, state) in states {
-        validate_path_segment(
+        validate_state_id(
             state_id,
             "workflow state ids must be non-empty",
             "workflow state ids must not have leading or trailing whitespace",
             "workflow state ids must be portable filesystem-safe path segments",
+            "workflow state ids must not use reserved name `templates`",
         )?;
 
         validate_non_blank(
@@ -173,11 +193,12 @@ fn validate_transitions(
     transitions: &BTreeMap<StateId, BTreeMap<TransitionId, WorkflowTransition>>,
 ) -> Result<(), ConfigValidationError> {
     for (from_state, transitions) in transitions {
-        validate_path_segment(
+        validate_state_id(
             from_state,
             "transition source ids must be non-empty",
             "transition source ids must not have leading or trailing whitespace",
             "transition source ids must be portable filesystem-safe state ids",
+            "transition source ids must not use reserved state id `templates`",
         )?;
 
         if !states.contains_key(from_state) {
@@ -416,6 +437,24 @@ done = { name = "Done" }
         .expect_err("windows reserved state id should fail");
 
         assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
+    }
+
+    #[test]
+    fn rejects_reserved_templates_state_id() {
+        let err = parse_workflow_config(
+            r#"
+initial_state = "templates"
+
+[states]
+templates = { name = "Templates" }
+done = { name = "Done" }
+"#,
+        )
+        .expect_err("reserved templates state id should fail");
+
+        assert!(matches!(err, GitlaneError::InvalidConfig { .. }));
+        assert!(err.to_string().contains("reserved"));
+        assert!(err.to_string().contains("templates"));
     }
 
     #[test]

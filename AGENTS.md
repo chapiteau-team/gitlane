@@ -148,6 +148,7 @@ If one cannot be run locally, explicitly note that in your handoff.
   `labels`), treat that as an error rather than guessing.
 - Workflow state ids and `issue_prefix` values become filesystem path segments; keep them portable across Linux,
   macOS, and Windows per `docs/issues/workflow.md` and `docs/issues/issues.md`.
+- The workflow state id `templates` is reserved for `.gitlane/issues/templates/` and must be rejected.
 - Planned `issue create` template resolution uses `.gitlane/issues/templates/default/` when `--template` is omitted,
   `.gitlane/issues/templates/<name>/` when `--template <name>` is provided, or `<templates-path>/<name-or-default>/`
   when `--templates-path` is provided. Template names are single directory names, template roots must contain

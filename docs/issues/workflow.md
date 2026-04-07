@@ -38,6 +38,7 @@ Workflow state ids must:
 - Not be `.` or `..`.
 - Not end with `.` or a space.
 - Not use Windows reserved device names such as `CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`, or `LPT1`-`LPT9`.
+- Not use the reserved name `templates`, because `.gitlane/issues/templates/` stores issue templates.
 
 Transition ids must be non-empty and must not have leading or trailing whitespace.
 
