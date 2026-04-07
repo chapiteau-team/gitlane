@@ -78,7 +78,8 @@ commands that are not yet implemented.
 - Issue state directories are derived from `.gitlane/issues/workflow.<ext>`; `init` fails if the workflow config is
   invalid.
 - `init` also creates `.gitlane/issues/templates/default/issue.md` when it is missing. The default template front
-  matter format matches the `--format` value used for that `init` invocation.
+  matter format matches the `--format` value used for that `init` invocation, and its placeholder metadata includes
+  `title`, `assignees`, and `labels`.
 
 ### Files and directories created when missing
 

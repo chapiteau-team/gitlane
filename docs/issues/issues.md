@@ -99,7 +99,8 @@ creation defaults.
 By default, issue templates live under `.gitlane/issues/templates`.
 
 `gitlane init` creates `.gitlane/issues/templates/default/issue.md` when it is missing. The default template front
-matter format matches the `gitlane init --format` value.
+matter format matches the `gitlane init --format` value, and its placeholder metadata includes `title`, `assignees`,
+and `labels`.
 
 `gitlane issue create --template <NAME>` resolves templates by name, not by nested path.
 

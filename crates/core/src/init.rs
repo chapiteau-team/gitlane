@@ -12,7 +12,7 @@ use crate::{
     },
     errors::GitlaneError,
     fs::{ensure_directory, ensure_file, write_text_file},
-    issues::{config, labels, workflow},
+    issues::{config, labels, templates, workflow},
     paths::{DEFAULT_ISSUE_TEMPLATE_NAME, ISSUE_FILE_NAME, ISSUE_TEMPLATES_DIR},
     project::ProjectConfig,
 };
@@ -61,14 +61,6 @@ fn default_issue_template_dir(project_path: &Path) -> PathBuf {
 
 fn default_issue_template_path(project_path: &Path) -> PathBuf {
     default_issue_template_dir(project_path).join(ISSUE_FILE_NAME)
-}
-
-fn default_issue_template_content(format: ConfigFileExtension) -> &'static str {
-    match format {
-        ConfigFileExtension::Toml => "+++\n+++\n",
-        ConfigFileExtension::Json => "{\n}\n",
-        ConfigFileExtension::Yaml | ConfigFileExtension::Yml => "---\n---\n",
-    }
 }
 
 /// Initialize project artifacts at `project_path`.
@@ -216,7 +208,7 @@ fn write_default_issue_template_if_missing(
         return Ok(());
     }
 
-    write_text_file(&template_path, default_issue_template_content(format))?;
+    write_text_file(&template_path, templates::default(format))?;
     Ok(())
 }
 
@@ -307,7 +299,7 @@ mod tests {
         assert_eq!(
             fs::read_to_string(default_issue_template_path(project_path))
                 .expect("default issue template should be readable"),
-            default_issue_template_content(ConfigFileExtension::Toml)
+            templates::default(ConfigFileExtension::Toml)
         );
     }
 
@@ -539,7 +531,7 @@ mod tests {
         assert_eq!(
             fs::read_to_string(default_issue_template_path(project_path))
                 .expect("default issue template should be readable"),
-            default_issue_template_content(ConfigFileExtension::Yaml)
+            templates::default(ConfigFileExtension::Yaml)
         );
         assert!(
             !config_path(project_path, ConfigKind::Project, ConfigFileExtension::Toml).exists()
@@ -582,7 +574,7 @@ mod tests {
         assert_eq!(
             fs::read_to_string(default_issue_template_path(project_path))
                 .expect("default issue template should be readable"),
-            default_issue_template_content(ConfigFileExtension::Json)
+            templates::default(ConfigFileExtension::Json)
         );
         assert!(
             !config_path(project_path, ConfigKind::Project, ConfigFileExtension::Toml).exists()
@@ -621,7 +613,7 @@ mod tests {
         assert_eq!(
             fs::read_to_string(default_issue_template_path(project_path))
                 .expect("default issue template should be readable"),
-            default_issue_template_content(ConfigFileExtension::Toml)
+            templates::default(ConfigFileExtension::Toml)
         );
         assert!(issues_dir.join("custom").is_dir());
         assert!(
