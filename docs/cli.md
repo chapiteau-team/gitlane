@@ -30,7 +30,7 @@ Global options:
     - Purpose: validate workflow, issue, and label configuration and data shape.
     - Status: scaffolded, not implemented.
 - `issue`
-    - `create`: create a new issue in the workflow initial state.
+    - `create [options]`: create a new issue in the workflow initial state.
     - `list`: list issues with deterministic ordering.
     - `show <id>`: display one issue by id.
     - `transition <id> <transition_id>`: move an issue using a workflow transition.
@@ -45,7 +45,8 @@ Global options:
     - `show <id>`: display one label definition.
     - Status: scaffolded, not implemented.
 
-Commands other than `init` are currently scaffolded.
+Commands other than `init` are currently scaffolded. Detailed sections below may describe planned behavior for
+commands that are not yet implemented.
 
 ## `init`
 
@@ -74,7 +75,10 @@ Commands other than `init` are currently scaffolded.
   If omitted, `init` defaults to `toml`.
 - If more than one supported config file exists for the same logical config (`project`, `workflow`, `issues`, or
   `labels`), Gitlane returns an error instead of guessing which file to use.
-- Issue state directories are derived from `.gitlane/issues/workflow.<ext>`; `init` fails if the workflow config is invalid.
+- Issue state directories are derived from `.gitlane/issues/workflow.<ext>`; `init` fails if the workflow config is
+  invalid.
+- `init` also creates `.gitlane/issues/templates/default/issue.md` when it is missing. The default template front
+  matter format matches the `--format` value used for that `init` invocation.
 
 ### Files and directories created when missing
 
@@ -85,6 +89,9 @@ Commands other than `init` are currently scaffolded.
     workflow.<ext>
     issues.<ext>
     labels.<ext>
+    templates/
+      default/
+        issue.md
     <one directory per workflow state>
 ```
 
@@ -164,16 +171,82 @@ gitlane --project ../my-repo init --name "My Repo"
 gitlane init --description "Git-native tracker" --homepage "https://example.com"
 ```
 
-## Command Entry Template
+## `issue create`
 
-### `<command>`
-
-- Purpose:
+- Purpose: create a new issue in the workflow initial state.
+- Status: planned, not implemented.
 - Usage:
+
   ```bash
-  gitlane <command> [options]
+  gitlane [--project <PATH>] issue create --title <TITLE> [--template <NAME>] [--templates-path <PATH>] [--reporter <PERSON>] [--assignee <PERSON>]... [--priority <ID>] [--label <ID>]... [--body <MARKDOWN>] [--body-file <PATH>]
   ```
-- Arguments:
+
 - Options:
-- Examples:
-- Notes:
+    - `--title <TITLE>`: required title stored in issue metadata.
+    - `--template <NAME>`: copy the template directory `<root>/<NAME>/` into the new issue directory. Template names
+      are single directory names only, not nested paths. If omitted, Gitlane uses `default`. The resolved template
+      directory must contain `issue.md` at its root.
+    - `--templates-path <PATH>`: override the template root directory used with `--template`. Relative paths resolve
+      from the project root. The resolved template directory becomes `<PATH>/<NAME>/`, where `<NAME>` is the explicit
+      `--template` value or `default` when `--template` is omitted.
+    - `--reporter <PERSON>`: reporter stored in issue metadata. If omitted, Gitlane uses `git config user.name` and
+      fails when that value is missing, blank, or invalid for the current project.
+    - `--assignee <PERSON>`: add an assignee. Repeatable.
+    - `--priority <ID>`: priority id from the issue config. If omitted, Gitlane uses the lowest-priority id, meaning
+      the last entry in `priority_order`.
+    - `--label <ID>`: add a label. Repeatable.
+    - `--body <MARKDOWN>`: append inline Markdown to the created issue body.
+    - `--body-file <PATH>`: append Markdown from a file to the created issue body.
+
+### Behavior
+
+- New issues are created in the workflow `initial_state`.
+- New issue ids use the `<prefix>-<base36(unix_ms)>` scheme described in [`docs/issues/issues.md`](issues/issues.md).
+- `issue create` always resolves a template directory before creating an issue. If `--template` is omitted, Gitlane
+  uses `default`.
+- `--title` is always required, even when `--template` is used.
+- When `--template` is present, Gitlane resolves `<NAME>` under `.gitlane/issues/templates/` by default, or under the
+  root provided by `--templates-path`.
+- When `--template` is omitted, Gitlane resolves `default` under `.gitlane/issues/templates/` by default, or under the
+  root provided by `--templates-path`.
+- Template names cannot contain path separators. Use names like `bug-regression`, not `bug/regression`.
+- Gitlane copies the entire resolved template directory into the new issue directory and uses the copied `issue.md` to
+  determine the created issue front matter format.
+- Explicit CLI flags override metadata values supplied by the template.
+- When a value is not provided as a flag, Gitlane uses the template value when available; otherwise it falls back to
+  creation defaults.
+- Creation defaults are:
+    - `reporter`: `git config user.name`
+    - `priority`: the last id in `priority_order`
+    - `assignees`: empty list
+    - `labels`: empty list
+- `--body-file` and `--body` append content after any template-provided body, in that order, with one blank line
+  inserted between non-empty body segments.
+- Labels remain subject to the label-group single-select rules described in [`docs/issues/labels.md`](issues/labels.md).
+
+### Precedence
+
+Issue creation resolves values in this order:
+
+1. Resolved template contents.
+2. Explicit CLI metadata overrides such as `--reporter`, `--priority`, `--assignee`, and `--label`.
+3. Creation defaults for any remaining required metadata.
+4. Body assembly in this order: template body, `--body-file`, `--body`.
+
+### Errors
+
+- Template names containing path separators are invalid.
+- A resolved template directory that does not exist is an error.
+- A resolved template directory without `issue.md` at its root is an error.
+- If `--reporter` is omitted and `git config user.name` is missing or blank, `issue create` fails.
+- If project `people` is configured and the resolved `reporter` is not in that list, `issue create` fails.
+- If project `people` is configured and any `assignee` is not in that list, `issue create` fails.
+
+### Examples
+
+```bash
+gitlane issue create --title "Document issue create"
+gitlane issue create --title "Document issue create" --priority p2 --label type_docs --body "Capture the planned command behavior."
+gitlane issue create --title "Triage release blocker" --template bug --label blocked --body-file ./notes/repro.md --body "Need release decision this week."
+gitlane issue create --title "Design review" --template default --templates-path ./docs/issue-templates
+```

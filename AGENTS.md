@@ -142,10 +142,17 @@ If one cannot be run locally, explicitly note that in your handoff.
   config file exists (`.gitlane/project.toml`, `.gitlane/project.json`, `.gitlane/project.yaml`, or
   `.gitlane/project.yml`), but it must fail once one already exists.
 - `init` accepts `--format toml|json|yaml|yml` for config files it creates and defaults to `toml`.
+- `init` also scaffolds `.gitlane/issues/templates/default/issue.md`; the default template front matter format matches
+  `init --format`.
 - If more than one supported config file exists for the same logical config (`project`, `workflow`, `issues`, or
   `labels`), treat that as an error rather than guessing.
 - Workflow state ids and `issue_prefix` values become filesystem path segments; keep them portable across Linux,
   macOS, and Windows per `docs/issues/workflow.md` and `docs/issues/issues.md`.
+- Planned `issue create` template resolution uses `.gitlane/issues/templates/default/` when `--template` is omitted,
+  `.gitlane/issues/templates/<name>/` when `--template <name>` is provided, or `<templates-path>/<name-or-default>/`
+  when `--templates-path` is provided. Template names are single directory names, template roots must contain
+  `issue.md`, and omitted reporters fall back to `git config user.name` but must still satisfy any configured
+  `people` list.
 - Before changing CLI behavior or config/data validation, read the relevant doc first:
   - `docs/cli.md` (command surface and expected behavior)
   - `docs/project.md` (`.gitlane/project.{toml,json,yaml,yml}` schema)

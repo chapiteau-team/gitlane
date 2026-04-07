@@ -91,6 +91,51 @@ p4 = { name = "Low", description = "Can be deferred" }
 - Labels and label groups are documented in [`labels.md`](labels.md).
 - Workflow states and transitions are documented in [`workflow.md`](workflow.md).
 
+## Issue Templates
+
+Issue templates are directories that Gitlane can copy into a new issue directory before applying metadata overrides and
+creation defaults.
+
+By default, issue templates live under `.gitlane/issues/templates`.
+
+`gitlane init` creates `.gitlane/issues/templates/default/issue.md` when it is missing. The default template front
+matter format matches the `gitlane init --format` value.
+
+`gitlane issue create --template <NAME>` resolves templates by name, not by nested path.
+
+If `--template` is omitted, `gitlane issue create` resolves the template name `default`.
+
+- Template names must be single directory names and must not contain path separators.
+- `bug-regression` is a valid template name.
+- `bug/regression` is not a valid template name.
+- `--templates-path <PATH>` overrides the template root for a single `gitlane issue create` invocation. Relative paths
+  resolve from the project root.
+
+Template directory layout:
+
+```text
+templates/
+  default/
+    issue.md
+  <name>/
+    issue.md
+    ...
+```
+
+Rules:
+
+- Each template directory must contain `issue.md` at its root.
+- `gitlane issue create` always resolves a template directory and copies the entire resolved template directory into the
+  new issue directory.
+- Extra files and directories in the template are copied as-is.
+- The copied `issue.md` is then updated with CLI-provided metadata overrides, creation defaults, and appended body
+  content.
+- Template `issue.md` files may provide reusable front matter values and body scaffolding. The final created issue must
+  still satisfy the full issue metadata schema described below.
+- When templates are stored under `.gitlane/issues/templates`, links such as `../../templates/bug/some.svg` remain
+  valid from both the template `issue.md` and the generated issue `issue.md`.
+- When `--templates-path` points elsewhere, users are responsible for making any referenced paths work.
+
 ## Issue Directory Structure
 
 Each workflow state directory under `.gitlane/issues` contains issue directories.
@@ -136,12 +181,22 @@ Collision strategy:
 
 ## Issue File Structure
 
-`issue.md` is Markdown with required TOML front matter, followed by a user-defined Markdown body.
+`issue.md` is Markdown with required front matter, followed by a user-defined Markdown body.
 
-This front matter format is unchanged even when repository config files use YAML or YML.
+Front matter format is chosen per issue:
+
+- `gitlane issue create` always preserves the front matter format from the resolved template `issue.md`.
+- If `--template` is omitted, the resolved template is `default`.
+
+### Front matter delimiters
+
+- TOML front matter uses opening and closing `+++` fences.
+- YAML and YML front matter use opening and closing `---` fences.
+- JSON front matter uses a top-level object delimited by `{` and `}` at the start of the file.
 
 ```markdown
 +++
+title = "Document issue create behavior"
 created_at = "2026-02-27T10:08:15Z"
 updated_at = "2026-02-27T10:08:15Z"
 reporter = "@kalaninja"
@@ -157,6 +212,7 @@ Any Markdown content is valid here.
 
 Required fields:
 
+- `title`: non-empty issue title string.
 - `created_at`: RFC3339 UTC timestamp (`Z` suffix).
 - `updated_at`: RFC3339 UTC timestamp (`Z` suffix).
 - `reporter`: person reference string (for example, `@kalaninja`).
@@ -166,6 +222,7 @@ Required fields:
 
 Semantics:
 
+- `title` must be non-empty.
 - `created_at` is immutable after issue creation.
 - `reporter` is immutable after issue creation.
 - `updated_at` must be greater than or equal to `created_at`.
@@ -177,6 +234,18 @@ Semantics:
 - Metadata key order has no semantic meaning.
 - Unknown metadata keys are allowed for forward compatibility.
 
+### Creation defaults
+
+- `title` must always be provided to `gitlane issue create`, even when a template is used.
+- If `reporter` is omitted during `gitlane issue create`, Gitlane uses `git config user.name`.
+- If `git config user.name` is missing or blank, `gitlane issue create` fails.
+- If project `people` is configured, the resolved `reporter` must be present in that list or `gitlane issue create`
+  fails.
+- If `priority` is omitted during `gitlane issue create`, Gitlane uses the last id in `priority_order`.
+- If `assignees` or `labels` are omitted during `gitlane issue create`, Gitlane stores empty arrays unless a template
+  supplies values.
+- Missing metadata values may be taken from the resolved template before creation defaults are applied.
+
 Path-derived fields:
 
 - Issue id is derived from `<id>` in `.gitlane/issues/<state>/<id>/issue.md`.
@@ -187,6 +256,8 @@ Path-derived fields:
 
 - The Markdown body is unconstrained and fully user-defined.
 - Tooling should treat body content as opaque unless explicitly editing it.
+- During `gitlane issue create`, any template-provided body comes first, followed by `--body-file`, then `--body`,
+  with one blank line inserted between non-empty segments.
 
 ### History
 
