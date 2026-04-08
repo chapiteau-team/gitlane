@@ -208,7 +208,7 @@ fn write_default_issue_template_if_missing(
         return Ok(());
     }
 
-    write_text_file(&template_path, templates::default(format))?;
+    write_text_file(&template_path, &templates::default(format))?;
     Ok(())
 }
 
