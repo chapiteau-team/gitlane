@@ -1,18 +1,31 @@
 use std::{collections::HashSet, path::Path};
 
+use thiserror::Error;
 use time::{OffsetDateTime, UtcOffset, format_description::well_known::Rfc3339};
 
 use crate::{
-    errors::{GitlaneError, IssueValidationError},
+    errors::GitlaneError,
     frontmatter::{self, FrontmatterDocument, FrontmatterSerializeError},
     fs::{ensure_file, read_text_file, write_text_file},
     issues::{config::PriorityId, labels::LabelId},
-    validate::validate_non_blank,
+    validate::{ValidationError, validate_non_blank},
 };
 
 pub(crate) mod repr;
 
 pub use crate::frontmatter::FrontmatterFormat;
+
+/// Validation error for parsed issue content.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error(transparent)]
+pub struct IssueValidationError(#[from] ValidationError);
+
+impl IssueValidationError {
+    /// Creates a new validation error with a user-facing message.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self(ValidationError::new(message))
+    }
+}
 
 /// Typed issue document loaded from `issue.md`.
 #[derive(Debug, Clone)]

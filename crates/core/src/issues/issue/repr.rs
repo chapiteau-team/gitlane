@@ -1,12 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    errors::IssueValidationError,
     frontmatter::FrontmatterSerializeError,
     issues::{config::PriorityId, labels::LabelId},
 };
 
-use super::{IssueMetadata, format_utc_timestamp, parse_utc_timestamp};
+use super::{IssueMetadata, IssueValidationError, format_utc_timestamp, parse_utc_timestamp};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub(crate) struct IssueMetadataRepr {

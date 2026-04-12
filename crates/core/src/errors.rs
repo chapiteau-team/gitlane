@@ -7,6 +7,7 @@ pub use crate::frontmatter::{FrontmatterParseError, FrontmatterSerializeError};
 use crate::{
     frontmatter::{FrontmatterError, FrontmatterValidationError},
     fs::FsError,
+    issues::issue::IssueValidationError,
     validate::ValidationError,
 };
 
@@ -171,18 +172,6 @@ impl ConfigSerializeError {
             Self::Json(_) => "JSON",
             Self::Yaml(_) => "YAML",
         }
-    }
-}
-
-/// Validation error for parsed issue content.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error(transparent)]
-pub struct IssueValidationError(#[from] ValidationError);
-
-impl IssueValidationError {
-    /// Creates a new validation error with a user-facing message.
-    pub fn new(message: impl Into<String>) -> Self {
-        Self(ValidationError::new(message))
     }
 }
 
