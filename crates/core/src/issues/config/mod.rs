@@ -99,7 +99,9 @@ fn validate_issue_prefix(issue_prefix: &str) -> Result<(), ConfigValidationError
         "`issue_prefix` must be a non-empty string",
         "`issue_prefix` must not have leading or trailing whitespace",
         "`issue_prefix` must be a portable filesystem-safe path segment",
-    )
+    )?;
+
+    Ok(())
 }
 
 fn validate_priorities(
@@ -188,10 +190,7 @@ mod tests {
     }
 
     fn parse_issues_config(content: &str) -> Result<IssuesConfig, GitlaneError> {
-        codec::parse::<IssuesConfig, super::repr::IssuesConfigRepr>(
-            content,
-            Path::new("issues.toml"),
-        )
+        codec::parse::<IssuesConfig, repr::IssuesConfigRepr>(content, Path::new("issues.toml"))
     }
 
     #[test]

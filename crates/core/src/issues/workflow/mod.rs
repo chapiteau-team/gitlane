@@ -254,7 +254,7 @@ mod tests {
     }
 
     fn parse_workflow_config(content: &str) -> Result<WorkflowConfig, GitlaneError> {
-        codec::parse::<WorkflowConfig, super::repr::WorkflowConfigRepr>(
+        codec::parse::<WorkflowConfig, repr::WorkflowConfigRepr>(
             content,
             Path::new("workflow.toml"),
         )

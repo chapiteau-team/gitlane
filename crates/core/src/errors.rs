@@ -7,6 +7,7 @@ pub use crate::frontmatter::{FrontmatterParseError, FrontmatterSerializeError};
 use crate::{
     frontmatter::{FrontmatterError, FrontmatterValidationError},
     fs::FsError,
+    validate::ValidationError,
 };
 
 /// Top-level error type for Gitlane core operations.
@@ -175,32 +176,24 @@ impl ConfigSerializeError {
 
 /// Validation error for parsed issue content.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("{message}")]
-pub struct IssueValidationError {
-    message: String,
-}
+#[error(transparent)]
+pub struct IssueValidationError(#[from] ValidationError);
 
 impl IssueValidationError {
     /// Creates a new validation error with a user-facing message.
     pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-        }
+        Self(ValidationError::new(message))
     }
 }
 
 /// Validation error for parsed config content.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("{message}")]
-pub struct ConfigValidationError {
-    message: String,
-}
+#[error(transparent)]
+pub struct ConfigValidationError(#[from] ValidationError);
 
 impl ConfigValidationError {
     /// Creates a new validation error with a user-facing message.
     pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-        }
+        Self(ValidationError::new(message))
     }
 }

@@ -97,10 +97,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn parse_project_config(content: &str) -> Result<ProjectConfig, GitlaneError> {
-        codec::parse::<ProjectConfig, super::repr::ProjectConfigRepr>(
-            content,
-            Path::new("project.toml"),
-        )
+        codec::parse::<ProjectConfig, repr::ProjectConfigRepr>(content, Path::new("project.toml"))
     }
 
     #[test]
@@ -441,7 +438,7 @@ people = ["@alice", "@bob", "@carol"]
 
     #[test]
     fn reports_toml_parse_errors_with_unified_variant() {
-        let err = codec::parse::<ProjectConfig, super::repr::ProjectConfigRepr>(
+        let err = codec::parse::<ProjectConfig, repr::ProjectConfigRepr>(
             "name = [",
             Path::new("project.toml"),
         )
@@ -458,7 +455,7 @@ people = ["@alice", "@bob", "@carol"]
 
     #[test]
     fn reports_yaml_parse_errors_with_unified_variant() {
-        let err = codec::parse::<ProjectConfig, super::repr::ProjectConfigRepr>(
+        let err = codec::parse::<ProjectConfig, repr::ProjectConfigRepr>(
             "name: [",
             Path::new("project.yaml"),
         )
@@ -475,11 +472,9 @@ people = ["@alice", "@bob", "@carol"]
 
     #[test]
     fn reports_json_parse_errors_with_unified_variant() {
-        let err = codec::parse::<ProjectConfig, super::repr::ProjectConfigRepr>(
-            "{",
-            Path::new("project.json"),
-        )
-        .expect_err("invalid JSON should fail");
+        let err =
+            codec::parse::<ProjectConfig, repr::ProjectConfigRepr>("{", Path::new("project.json"))
+                .expect_err("invalid JSON should fail");
 
         assert!(matches!(
             err,

@@ -3,7 +3,7 @@ use std::{collections::HashSet, path::Path};
 use time::{OffsetDateTime, UtcOffset, format_description::well_known::Rfc3339};
 
 use crate::{
-    errors::{ConfigValidationError, GitlaneError, IssueValidationError},
+    errors::{GitlaneError, IssueValidationError},
     frontmatter::{self, FrontmatterDocument, FrontmatterSerializeError},
     fs::{ensure_file, read_text_file, write_text_file},
     issues::{config::PriorityId, labels::LabelId},
@@ -347,11 +347,8 @@ fn validate_issue_non_blank(
     value: &str,
     message: impl Into<String>,
 ) -> Result<(), IssueValidationError> {
-    validate_non_blank(value, message).map_err(issue_validation_from_config)
-}
-
-fn issue_validation_from_config(source: ConfigValidationError) -> IssueValidationError {
-    IssueValidationError::new(source.to_string())
+    validate_non_blank(value, message)?;
+    Ok(())
 }
 
 #[cfg(test)]

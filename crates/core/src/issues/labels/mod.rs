@@ -240,10 +240,7 @@ mod tests {
     }
 
     fn parse_labels_config(content: &str) -> Result<LabelsConfig, GitlaneError> {
-        codec::parse::<LabelsConfig, super::repr::LabelsConfigRepr>(
-            content,
-            Path::new("labels.toml"),
-        )
+        codec::parse::<LabelsConfig, repr::LabelsConfigRepr>(content, Path::new("labels.toml"))
     }
 
     #[test]

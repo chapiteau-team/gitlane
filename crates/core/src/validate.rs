@@ -1,4 +1,20 @@
-use crate::errors::ConfigValidationError;
+use thiserror::Error;
+
+/// Shared validation error for message-only validators.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("{message}")]
+pub(crate) struct ValidationError {
+    message: String,
+}
+
+impl ValidationError {
+    /// Creates a new validation error with a user-facing message.
+    pub(crate) fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
 
 const WINDOWS_RESERVED_PATH_SEGMENTS: &[&str] = &[
     "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
@@ -8,9 +24,9 @@ const WINDOWS_RESERVED_PATH_SEGMENTS: &[&str] = &[
 pub(crate) fn validate_non_blank(
     value: &str,
     message: impl Into<String>,
-) -> Result<(), ConfigValidationError> {
+) -> Result<(), ValidationError> {
     if value.trim().is_empty() {
-        return Err(ConfigValidationError::new(message));
+        return Err(ValidationError::new(message));
     }
 
     Ok(())
@@ -20,13 +36,13 @@ pub(crate) fn validate_id(
     id: &str,
     empty_message: impl Into<String>,
     whitespace_message: impl Into<String>,
-) -> Result<(), ConfigValidationError> {
+) -> Result<(), ValidationError> {
     if id.is_empty() {
-        return Err(ConfigValidationError::new(empty_message));
+        return Err(ValidationError::new(empty_message));
     }
 
     if id.trim() != id {
-        return Err(ConfigValidationError::new(whitespace_message));
+        return Err(ValidationError::new(whitespace_message));
     }
 
     Ok(())
@@ -37,7 +53,7 @@ pub(crate) fn validate_path_segment(
     empty_message: impl Into<String>,
     whitespace_message: impl Into<String>,
     invalid_message: impl Into<String>,
-) -> Result<(), ConfigValidationError> {
+) -> Result<(), ValidationError> {
     validate_id(value, empty_message, whitespace_message)?;
 
     if value == "."
@@ -47,7 +63,7 @@ pub(crate) fn validate_path_segment(
         || value.chars().any(is_invalid_path_segment_char)
         || is_windows_reserved_path_segment(value)
     {
-        return Err(ConfigValidationError::new(invalid_message));
+        return Err(ValidationError::new(invalid_message));
     }
 
     Ok(())
@@ -73,7 +89,7 @@ mod tests {
     const WHITESPACE_MESSAGE: &str = "value must not have surrounding whitespace";
     const INVALID_MESSAGE: &str = "value must be a portable filesystem-safe path segment";
 
-    fn validate(value: &str) -> Result<(), ConfigValidationError> {
+    fn validate(value: &str) -> Result<(), ValidationError> {
         validate_path_segment(value, EMPTY_MESSAGE, WHITESPACE_MESSAGE, INVALID_MESSAGE)
     }
 
