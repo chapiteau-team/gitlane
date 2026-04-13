@@ -1,3 +1,5 @@
+//! Validated issue label config types and rules.
+
 use std::{collections::BTreeMap, path::Path};
 
 use crate::{

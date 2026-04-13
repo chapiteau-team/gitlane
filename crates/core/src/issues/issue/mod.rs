@@ -1,3 +1,5 @@
+//! Typed issue document parsing, validation, and persistence.
+
 use std::{collections::HashSet, path::Path};
 
 use thiserror::Error;

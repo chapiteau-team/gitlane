@@ -1,3 +1,5 @@
+//! Validated issue workflow config types and rules.
+
 use std::{collections::BTreeMap, path::Path};
 
 use crate::{

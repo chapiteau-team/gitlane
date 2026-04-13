@@ -1,3 +1,5 @@
+//! Config file discovery and format helpers for Gitlane project data.
+
 use std::path::{Path, PathBuf};
 
 use thiserror::Error;
@@ -19,9 +21,13 @@ pub const ISSUES_WORKFLOW_CONFIG_STEM: &str = "workflow";
 /// Logical config file kinds supported by Gitlane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigKind {
+    /// Project metadata config stored at the project root.
     Project,
+    /// Issue tracker config stored under `.gitlane/issues`.
     Issues,
+    /// Issue labels config stored under `.gitlane/issues`.
     IssuesLabels,
+    /// Issue workflow config stored under `.gitlane/issues`.
     IssuesWorkflow,
 }
 
@@ -40,19 +46,26 @@ impl ConfigKind {
 /// File extensions accepted for config files.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigFileExtension {
+    /// TOML config files.
     Toml,
+    /// JSON config files.
     Json,
+    /// YAML config files using the `.yaml` extension.
     Yaml,
+    /// YAML config files using the `.yml` extension.
     Yml,
 }
 
 /// Parser-specific errors for supported config formats.
 #[derive(Debug, Error)]
 pub enum ConfigParseError {
+    /// TOML parser error.
     #[error(transparent)]
     Toml(#[from] toml::de::Error),
+    /// JSON parser error.
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    /// YAML parser error.
     #[error(transparent)]
     Yaml(#[from] serde_yaml::Error),
 }
@@ -70,10 +83,13 @@ impl ConfigParseError {
 /// Serializer-specific errors for supported config formats.
 #[derive(Debug, Error)]
 pub enum ConfigSerializeError {
+    /// TOML serializer error.
     #[error(transparent)]
     Toml(#[from] toml_edit::ser::Error),
+    /// JSON serializer error.
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    /// YAML serializer error.
     #[error(transparent)]
     Yaml(#[from] serde_yaml::Error),
 }

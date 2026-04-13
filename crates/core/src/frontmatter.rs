@@ -14,12 +14,16 @@ pub(crate) const JSON_OBJECT_END: char = '}';
 /// Parser-specific errors for supported front matter formats.
 #[derive(Debug, Error)]
 pub enum FrontmatterParseError {
+    /// TOML front matter parser error.
     #[error(transparent)]
     Toml(#[from] toml::de::Error),
+    /// TOML document parser error used for editable TOML front matter.
     #[error(transparent)]
     TomlDocument(#[from] toml_edit::TomlError),
+    /// JSON front matter parser error.
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    /// YAML front matter parser error.
     #[error(transparent)]
     Yaml(#[from] serde_yaml::Error),
 }
@@ -38,10 +42,13 @@ impl FrontmatterParseError {
 /// Serializer-specific errors for supported front matter formats.
 #[derive(Debug, Error)]
 pub enum FrontmatterSerializeError {
+    /// Timestamp formatting error while rendering front matter.
     #[error(transparent)]
     TimeFormat(#[from] time::error::Format),
+    /// JSON front matter serializer error.
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    /// YAML front matter serializer error.
     #[error(transparent)]
     Yaml(#[from] serde_yaml::Error),
 }
@@ -80,10 +87,14 @@ pub(crate) enum FrontmatterError {
     Parse(#[from] FrontmatterParseError),
 }
 
+/// Supported serialized front matter formats for issue documents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrontmatterFormat {
+    /// TOML front matter delimited by `+++` fences.
     Toml,
+    /// JSON front matter stored as a top-level object.
     Json,
+    /// YAML front matter delimited by `---` fences.
     Yaml,
 }
 

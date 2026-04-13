@@ -1,3 +1,5 @@
+//! Validated project metadata config.
+
 use std::{collections::HashSet, path::Path};
 
 use crate::{

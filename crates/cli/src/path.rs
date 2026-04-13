@@ -1,3 +1,5 @@
+//! Helpers for resolving the active Gitlane project directory.
+
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
@@ -9,6 +11,7 @@ use gitlane::{
     paths::GITLANE_DIR,
 };
 
+/// Resolves the nearest `.gitlane` directory from `start_path` or its parents.
 pub fn resolve_project(start_path: &Path) -> anyhow::Result<PathBuf> {
     let start = start_path
         .canonicalize()

@@ -1,3 +1,5 @@
+//! Core library for loading, validating, and scaffolding Gitlane projects.
+
 mod codec;
 pub mod config;
 pub mod errors;

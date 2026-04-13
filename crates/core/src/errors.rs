@@ -1,3 +1,5 @@
+//! Shared error types for Gitlane core operations.
+
 use std::path::{Path, PathBuf};
 
 use thiserror::Error;
@@ -14,44 +16,55 @@ use crate::{
 /// Top-level error type for Gitlane core operations.
 #[derive(Debug, Error)]
 pub enum GitlaneError {
+    /// The provided project name was empty or whitespace-only.
     #[error("project name must be a non-empty, non-whitespace string")]
     InvalidProjectName,
+    /// Initialization was attempted where a project config already exists.
     #[error("project already exists at `{path}`")]
     ProjectAlreadyExists { path: PathBuf },
+    /// A required logical config file was not found.
     #[error("missing supported {config_name} config file in `{directory}`")]
     MissingConfigFile {
         config_name: &'static str,
         directory: PathBuf,
     },
+    /// More than one supported file exists for the same logical config.
     #[error("found multiple supported {config_name} config files: {paths:?}")]
     AmbiguousConfigFiles {
         config_name: &'static str,
         paths: Vec<PathBuf>,
     },
+    /// A config file path did not use a supported extension.
     #[error("unsupported config format for `{path}`; expected .toml, .json, .yaml, or .yml")]
     UnsupportedConfigFormat { path: PathBuf },
+    /// A config file parsed but failed semantic validation.
     #[error("invalid config in `{path}`: {message}")]
     InvalidConfig { path: PathBuf, message: String },
+    /// Parsing a config file failed.
     #[error("failed to parse `{path}` as {format}", format = .source.format_name())]
     ParseConfig {
         path: PathBuf,
         #[source]
         source: ConfigParseError,
     },
+    /// Serializing a config file failed.
     #[error("failed to serialize `{path}` as {format}", format = .source.format_name())]
     SerializeConfig {
         path: PathBuf,
         #[source]
         source: ConfigSerializeError,
     },
+    /// Issue front matter parsed but failed semantic validation.
     #[error("invalid front matter in `{path}`: {message}")]
     InvalidFrontmatter { path: PathBuf, message: String },
+    /// Parsing issue front matter failed.
     #[error("failed to parse front matter in `{path}` as {format}", format = .source.format_name())]
     ParseFrontmatter {
         path: PathBuf,
         #[source]
         source: FrontmatterParseError,
     },
+    /// Serializing issue front matter failed.
     #[error(
         "failed to serialize front matter in `{path}` as {format}",
         format = .source.format_name()
@@ -61,8 +74,10 @@ pub enum GitlaneError {
         #[source]
         source: FrontmatterSerializeError,
     },
+    /// Parsed issue metadata failed semantic validation.
     #[error("invalid issue in `{path}`: {message}")]
     InvalidIssue { path: PathBuf, message: String },
+    /// A filesystem operation failed.
     #[error(transparent)]
     Filesystem(#[from] FsError),
 }

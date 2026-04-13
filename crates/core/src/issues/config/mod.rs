@@ -1,3 +1,5 @@
+//! Validated issue tracker config types and rules.
+
 use std::{
     collections::{BTreeMap, HashSet},
     path::Path,

@@ -1,3 +1,5 @@
+//! Canonical directory and file names used in Gitlane projects.
+
 /// Name of the repository-local Gitlane directory.
 pub const GITLANE_DIR: &str = ".gitlane";
 

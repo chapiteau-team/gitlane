@@ -1,3 +1,5 @@
+//! Gitlane command-line entry point.
+
 mod cli;
 mod path;
 

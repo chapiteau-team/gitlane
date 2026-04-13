@@ -1,3 +1,5 @@
+//! Built-in issue template scaffolding helpers.
+
 use crate::config::ConfigFileExtension;
 use crate::frontmatter::{JSON_OBJECT_END, JSON_OBJECT_START, TOML_FENCE, YAML_FENCE};
 
