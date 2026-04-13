@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{codec::TomlFormat, errors::ConfigValidationError};
+use crate::{codec::TomlFormat, config::ConfigValidationError};
 
 use super::ProjectConfig;
 

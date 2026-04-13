@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use crate::{errors::GitlaneError, fs::ensure_file, paths::ISSUES_DIR};
+use thiserror::Error;
+
+use crate::{errors::GitlaneError, fs::ensure_file, paths::ISSUES_DIR, validate::ValidationError};
 
 /// Basename for the project config file.
 pub const PROJECT_CONFIG_STEM: &str = "project";
@@ -42,6 +44,60 @@ pub enum ConfigFileExtension {
     Json,
     Yaml,
     Yml,
+}
+
+/// Parser-specific errors for supported config formats.
+#[derive(Debug, Error)]
+pub enum ConfigParseError {
+    #[error(transparent)]
+    Toml(#[from] toml::de::Error),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Yaml(#[from] serde_yaml::Error),
+}
+
+impl ConfigParseError {
+    pub(crate) fn format_name(&self) -> &'static str {
+        match self {
+            Self::Toml(_) => "TOML",
+            Self::Json(_) => "JSON",
+            Self::Yaml(_) => "YAML",
+        }
+    }
+}
+
+/// Serializer-specific errors for supported config formats.
+#[derive(Debug, Error)]
+pub enum ConfigSerializeError {
+    #[error(transparent)]
+    Toml(#[from] toml_edit::ser::Error),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Yaml(#[from] serde_yaml::Error),
+}
+
+impl ConfigSerializeError {
+    pub(crate) fn format_name(&self) -> &'static str {
+        match self {
+            Self::Toml(_) => "TOML",
+            Self::Json(_) => "JSON",
+            Self::Yaml(_) => "YAML",
+        }
+    }
+}
+
+/// Validation error for parsed config content.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error(transparent)]
+pub struct ConfigValidationError(#[from] ValidationError);
+
+impl ConfigValidationError {
+    /// Creates a new validation error with a user-facing message.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self(ValidationError::new(message))
+    }
 }
 
 impl ConfigFileExtension {

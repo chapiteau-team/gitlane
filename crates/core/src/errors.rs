@@ -5,10 +5,10 @@ use thiserror::Error;
 pub use crate::frontmatter::{FrontmatterParseError, FrontmatterSerializeError};
 
 use crate::{
+    config::{ConfigParseError, ConfigSerializeError, ConfigValidationError},
     frontmatter::{FrontmatterError, FrontmatterValidationError},
     fs::FsError,
     issues::issue::IssueValidationError,
-    validate::ValidationError,
 };
 
 /// Top-level error type for Gitlane core operations.
@@ -130,59 +130,5 @@ impl GitlaneError {
             path: path.to_path_buf(),
             message: source.to_string(),
         }
-    }
-}
-
-/// Parser-specific errors for supported config formats.
-#[derive(Debug, Error)]
-pub enum ConfigParseError {
-    #[error(transparent)]
-    Toml(#[from] toml::de::Error),
-    #[error(transparent)]
-    Json(#[from] serde_json::Error),
-    #[error(transparent)]
-    Yaml(#[from] serde_yaml::Error),
-}
-
-impl ConfigParseError {
-    fn format_name(&self) -> &'static str {
-        match self {
-            Self::Toml(_) => "TOML",
-            Self::Json(_) => "JSON",
-            Self::Yaml(_) => "YAML",
-        }
-    }
-}
-
-/// Serializer-specific errors for supported config formats.
-#[derive(Debug, Error)]
-pub enum ConfigSerializeError {
-    #[error(transparent)]
-    Toml(#[from] toml_edit::ser::Error),
-    #[error(transparent)]
-    Json(#[from] serde_json::Error),
-    #[error(transparent)]
-    Yaml(#[from] serde_yaml::Error),
-}
-
-impl ConfigSerializeError {
-    fn format_name(&self) -> &'static str {
-        match self {
-            Self::Toml(_) => "TOML",
-            Self::Json(_) => "JSON",
-            Self::Yaml(_) => "YAML",
-        }
-    }
-}
-
-/// Validation error for parsed config content.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error(transparent)]
-pub struct ConfigValidationError(#[from] ValidationError);
-
-impl ConfigValidationError {
-    /// Creates a new validation error with a user-facing message.
-    pub fn new(message: impl Into<String>) -> Self {
-        Self(ValidationError::new(message))
     }
 }

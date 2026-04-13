@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     codec::{TomlFormat, inline_child_tables, table_mut},
-    errors::ConfigValidationError,
+    config::ConfigValidationError,
 };
 
 use super::{IssuePriority, IssuesConfig, PriorityId};

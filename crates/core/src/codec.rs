@@ -4,8 +4,8 @@ use serde::{Serialize, de::DeserializeOwned};
 use toml_edit::{DocumentMut, Item, Table, value};
 
 use crate::{
-    config::ConfigFileExtension,
-    errors::{ConfigValidationError, GitlaneError},
+    config::{ConfigFileExtension, ConfigValidationError},
+    errors::GitlaneError,
     fs::{read_text_file, write_text_file},
 };
 

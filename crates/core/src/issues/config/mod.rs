@@ -5,7 +5,8 @@ use std::{
 
 use crate::{
     codec,
-    errors::{ConfigValidationError, GitlaneError},
+    config::ConfigValidationError,
+    errors::GitlaneError,
     validate::{validate_id, validate_non_blank, validate_path_segment},
 };
 

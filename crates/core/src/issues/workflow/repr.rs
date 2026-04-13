@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     codec::{TomlFormat, ensure_table, inline_child_tables, table_mut},
-    errors::ConfigValidationError,
+    config::ConfigValidationError,
 };
 
 use super::{StateId, TransitionId, WorkflowConfig, WorkflowState, WorkflowTransition};

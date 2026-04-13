@@ -2,7 +2,8 @@ use std::{collections::BTreeMap, path::Path};
 
 use crate::{
     codec,
-    errors::{ConfigValidationError, GitlaneError},
+    config::ConfigValidationError,
+    errors::GitlaneError,
     paths::ISSUE_TEMPLATES_DIR,
     validate::{validate_id, validate_non_blank, validate_path_segment},
 };

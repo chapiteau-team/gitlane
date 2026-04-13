@@ -1,9 +1,7 @@
 use std::{collections::HashSet, path::Path};
 
 use crate::{
-    codec,
-    errors::{ConfigValidationError, GitlaneError},
-    validate::validate_non_blank,
+    codec, config::ConfigValidationError, errors::GitlaneError, validate::validate_non_blank,
 };
 
 mod repr;
@@ -91,8 +89,10 @@ mod tests {
 
     use crate::{
         codec,
-        config::{ConfigFileExtension, ConfigKind, config_path, require_config_path},
-        errors::{ConfigParseError, GitlaneError},
+        config::{
+            ConfigFileExtension, ConfigKind, ConfigParseError, config_path, require_config_path,
+        },
+        errors::GitlaneError,
     };
     use tempfile::TempDir;
 

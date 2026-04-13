@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::errors::ConfigValidationError;
+use crate::config::ConfigValidationError;
 
 use super::{IssuePriority, IssuesConfig};
 
