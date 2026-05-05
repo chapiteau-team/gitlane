@@ -73,6 +73,25 @@ jobs:
       - name: Type-check workspace against MSRV
         run: cargo check --workspace --locked
 
+  doc:
+    name: Doc build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build docs (warnings as errors)
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --workspace --no-deps --lib
+
   test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

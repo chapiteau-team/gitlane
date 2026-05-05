@@ -34,9 +34,13 @@ test:
 msrv:
     cargo +1.88 check --workspace --locked
 
+# Build documentation with warnings as errors (mirrors the CI doc gate)
+doc:
+    RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --lib
+
 # Run the gitlane CLI; canonical form: `just run -- <args>`
 run *args:
     cargo run -p gitlane-cli -- {{ args }}
 
 # Run everything CI runs locally
-ci: fmt-check lint deny test
+ci: fmt-check lint deny msrv test doc
