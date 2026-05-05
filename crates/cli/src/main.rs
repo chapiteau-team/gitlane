@@ -22,10 +22,15 @@ fn main() -> anyhow::Result<()> {
                 .name
                 .map_or_else(|| infer_project_name(&project_root), Ok)?;
             let format = args.format.map_or(ConfigFileExtension::Toml, Into::into);
-            let options = InitOptions::new(name, args.description, args.homepage, format)?;
+            let options = InitOptions::new(name.clone(), args.description, args.homepage, format)?;
             let project_path = project_root.join(GITLANE_DIR);
 
-            let _service = Gitlane::init(project_path, options)?;
+            Gitlane::init(project_path.clone(), options)?;
+            println!(
+                "Initialized gitlane project \"{name}\" at {} (format: {})",
+                project_path.display(),
+                format.as_str(),
+            );
             Ok(())
         }
         _ => {
