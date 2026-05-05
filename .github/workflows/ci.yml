@@ -52,7 +52,6 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
-          arguments: --all-features
 
   test:
     name: Test (${{ matrix.os }})

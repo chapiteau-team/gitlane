@@ -23,7 +23,7 @@ The repo ships a `justfile` mirroring the cargo invocations below. Prefer the `j
 | `just fmt`            | `cargo fmt --all`                                                       |
 | `just fmt-check`      | `cargo fmt --all -- --check`                                            |
 | `just lint`           | `cargo clippy --workspace --all-targets --all-features -- -D warnings`  |
-| `just deny`           | `cargo deny check --all-features`                                       |
+| `just deny`           | `cargo deny check`                                       |
 | `just test`           | `cargo test --workspace`                                                |
 | `just run -- <args>`  | `cargo run -p gitlane-cli -- <args>`                                    |
 | `just ci`             | `fmt-check` + `lint` + `deny` + `test` (full local verification bundle) |
@@ -58,7 +58,7 @@ If any of these files appear later, treat them as high-priority constraints and 
   `cargo clippy --workspace --all-targets --all-features --no-deps -- -D warnings`
 
 ### Dependency Audit
-- Run `cargo deny check --all-features` to validate advisories, bans, licenses, and sources against `deny.toml`.
+- Run `cargo deny check` to validate advisories, bans, licenses, and sources against `deny.toml`.
 - Install with `cargo install --locked cargo-deny` if not present.
 
 ### Tests
@@ -73,7 +73,7 @@ If any of these files appear later, treat them as high-priority constraints and 
   - `cargo fmt --all -- --check`
   - `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - `deny` job (`ubuntu-latest`):
-  - `cargo deny check --all-features`
+  - `cargo deny check`
 - `test` job matrix (`ubuntu-latest`, `windows-latest`, `macos-latest`):
   - `cargo test --workspace`
 
@@ -94,7 +94,7 @@ If any of these files appear later, treat them as high-priority constraints and 
 Run these before finalizing substantial changes:
 1. `cargo fmt --all -- --check`
 2. `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-3. `cargo deny check --all-features` (if `cargo-deny` is installed)
+3. `cargo deny check` (if `cargo-deny` is installed)
 4. `cargo test --workspace`
 
 Or run the whole bundle: `just ci`.
@@ -195,7 +195,7 @@ If one cannot be run locally, explicitly note that in your handoff.
 - Run CLI: `cargo run -p gitlane-cli -- <command>`
 - Format check: `cargo fmt --all -- --check`
 - Lint: `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-- Dependency audit: `cargo deny check --all-features`
+- Dependency audit: `cargo deny check`
 - Test all: `cargo test --workspace`
 - GitHub CI workflow: `.github/workflows/ci.yml`
 - Test one (substring): `cargo test -p <package> name_substring`

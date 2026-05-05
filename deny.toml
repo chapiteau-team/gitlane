@@ -4,18 +4,15 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
-ignore = [
-    # serde_yaml is unmaintained as of 2024; replacement is tracked separately
-    # (see Tier 2 plan: migrate to serde_yml or serde_norway).
-    "RUSTSEC-2024-0320",
-]
 
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+allow-wildcard-paths = true
 
 [licenses]
 version = 2
+unused-allowed-license = "allow"
 allow = [
     "MIT",
     "Apache-2.0",

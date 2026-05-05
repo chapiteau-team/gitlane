@@ -24,7 +24,7 @@ lint:
 
 # Run cargo-deny (advisories, bans, licenses, sources)
 deny:
-    cargo deny check --all-features
+    cargo deny check
 
 # Run all workspace tests
 test:
