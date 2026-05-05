@@ -25,6 +25,8 @@ The repo ships a `justfile` mirroring the cargo invocations below. Prefer the `j
 | `just lint`           | `cargo clippy --workspace --all-targets --all-features -- -D warnings`  |
 | `just deny`           | `cargo deny check`                                       |
 | `just test`           | `cargo test --workspace`                                                |
+| `just test-ut`        | `cargo test --workspace --lib --bins` (unit only)                       |
+| `just test-it`        | `cargo test --workspace --tests` (integration only)                     |
 | `just msrv`           | `cargo +1.88 check --workspace --locked` (MSRV pin from Cargo.toml)     |
 | `just doc`            | `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --lib`      |
 | `just run -- <args>`  | `cargo run -p gitlane-cli -- <args>`                                    |

@@ -26,9 +26,17 @@ lint:
 deny:
     cargo deny check
 
-# Run all workspace tests
+# Run all workspace tests (unit + integration + doc)
 test:
     cargo test --workspace
+
+# Run only unit tests (in `mod tests` blocks inside lib and bin targets)
+test-ut:
+    cargo test --workspace --lib --bins
+
+# Run only integration tests (files under `crates/*/tests/`)
+test-it:
+    cargo test --workspace --tests
 
 # Type-check against the MSRV toolchain (must match rust-version in Cargo.toml)
 msrv:
