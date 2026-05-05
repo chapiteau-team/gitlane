@@ -25,6 +25,7 @@ The repo ships a `justfile` mirroring the cargo invocations below. Prefer the `j
 | `just lint`           | `cargo clippy --workspace --all-targets --all-features -- -D warnings`  |
 | `just deny`           | `cargo deny check`                                       |
 | `just test`           | `cargo test --workspace`                                                |
+| `just msrv`           | `cargo +1.88 check --workspace --locked` (MSRV pin from Cargo.toml)     |
 | `just run -- <args>`  | `cargo run -p gitlane-cli -- <args>`                                    |
 | `just ci`             | `fmt-check` + `lint` + `deny` + `test` (full local verification bundle) |
 
@@ -74,6 +75,8 @@ If any of these files appear later, treat them as high-priority constraints and 
   - `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - `deny` job (`ubuntu-latest`):
   - `cargo deny check`
+- `msrv` job (`ubuntu-latest`):
+  - `cargo check --workspace --locked` on the toolchain pinned in `rust-version`
 - `test` job matrix (`ubuntu-latest`, `windows-latest`, `macos-latest`):
   - `cargo test --workspace`
 

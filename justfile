@@ -30,6 +30,10 @@ deny:
 test:
     cargo test --workspace
 
+# Type-check against the MSRV toolchain (must match rust-version in Cargo.toml)
+msrv:
+    cargo +1.88 check --workspace --locked
+
 # Run the gitlane CLI; canonical form: `just run -- <args>`
 run *args:
     cargo run -p gitlane-cli -- {{ args }}

@@ -53,6 +53,26 @@ jobs:
         with:
           command: check
 
+  msrv:
+    # Keep the toolchain version in sync with `rust-version` in Cargo.toml.
+    name: MSRV (1.88)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install MSRV toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.88"
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Type-check workspace against MSRV
+        run: cargo check --workspace --locked
+
   test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
